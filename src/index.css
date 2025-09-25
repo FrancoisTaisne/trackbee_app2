@@ -1,0 +1,435 @@
+/**
+ * TrackBee App v2 - Styles Globaux
+ * Configuration CSS avec TailwindCSS et variables personnalisées
+ */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+
+/* ==================== FONTS ====================*/
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* ==================== CSS VARIABLES ====================*/
+:root {
+  /* Couleurs système */
+  --color-background: 255 255 255;
+  --color-foreground: 17 24 39;
+  --color-muted: 249 250 251;
+  --color-muted-foreground: 107 114 128;
+
+  /* Couleurs d'accent */
+  --color-primary: 14 165 233;
+  --color-primary-foreground: 255 255 255;
+  --color-secondary: 243 244 246;
+  --color-secondary-foreground: 17 24 39;
+
+  /* Couleurs de bordure */
+  --color-border: 229 231 235;
+  --color-input: 229 231 235;
+  --color-ring: 14 165 233;
+
+  /* Couleurs destructives */
+  --color-destructive: 239 68 68;
+  --color-destructive-foreground: 255 255 255;
+
+  /* Variables spécifiques TrackBee */
+  --trackbee-header-height: 3.5rem;
+  --trackbee-nav-height: 4rem;
+  --trackbee-sidebar-width: 16rem;
+  --trackbee-sidebar-collapsed-width: 4rem;
+
+  /* Safe area insets pour mobile */
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+
+  /* Variables d'animation */
+  --animation-duration-fast: 150ms;
+  --animation-duration-normal: 300ms;
+  --animation-duration-slow: 500ms;
+  --animation-timing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Mode sombre */
+.dark {
+  --color-background: 17 24 39;
+  --color-foreground: 249 250 251;
+  --color-muted: 31 41 55;
+  --color-muted-foreground: 156 163 175;
+
+  --color-primary: 56 189 248;
+  --color-primary-foreground: 17 24 39;
+  --color-secondary: 55 65 81;
+  --color-secondary-foreground: 249 250 251;
+
+  --color-border: 55 65 81;
+  --color-input: 55 65 81;
+  --color-ring: 56 189 248;
+
+  --color-destructive: 220 38 38;
+  --color-destructive-foreground: 249 250 251;
+}
+
+/* ==================== BASE STYLES ====================*/
+* {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: #e5e7eb;
+}
+
+html {
+  /* Prévenir le zoom sur iOS */
+  -webkit-text-size-adjust: 100%;
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  /* Touch action */
+  touch-action: manipulation;
+}
+
+body {
+  background-color: white; color: #111827;
+  @apply font-sans antialiased;
+
+  /* Prévenir le rebond sur iOS */
+  overscroll-behavior-y: none;
+
+  /* Height full pour mobile */
+  min-height: 100vh;
+  min-height: 100dvh; /* Dynamic viewport height */
+
+  /* Gestion du safe area */
+  padding-top: var(--safe-area-top);
+  padding-bottom: var(--safe-area-bottom);
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
+}
+
+/* Sélection de texte */
+::selection {
+  @apply bg-trackbee-500/20 text-trackbee-900;
+}
+
+.dark ::selection {
+  @apply bg-trackbee-400/30 text-trackbee-100;
+}
+
+/* ==================== SCROLLBARS ====================*/
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-800;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400 dark:bg-gray-500;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db #f3f4f6;
+}
+
+.dark * {
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+/* ==================== FOCUS STATES ====================*/
+/* Améliorer les états de focus pour l'accessibilité */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-trackbee-500;
+}
+
+.dark .focus-ring {
+  @apply focus:ring-offset-gray-800;
+}
+
+/* Focus visible seulement au clavier */
+.focus-visible-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-trackbee-500;
+}
+
+/* ==================== ANIMATIONS ====================*/
+/* Réduire les animations si préféré */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Animation d'entrée pour les éléments */
+.animate-in {
+  animation: fadeIn var(--animation-duration-normal) var(--animation-timing);
+}
+
+/* Animation de sortie */
+.animate-out {
+  animation: fadeOut var(--animation-duration-normal) var(--animation-timing);
+}
+
+/* ==================== TYPOGRAPHY ====================*/
+/* Améliorer la lisibilité */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Liens */
+a {
+  @apply text-trackbee-600 hover:text-trackbee-700 dark:text-trackbee-400 dark:hover:text-trackbee-300;
+  @apply transition-colors duration-200;
+}
+
+/* Code inline */
+code {
+  @apply px-1.5 py-0.5 text-sm bg-gray-100 dark:bg-gray-800 rounded text-trackbee-600 dark:text-trackbee-400;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+/* ==================== LAYOUT HELPERS ====================*/
+/* Container principal */
+.container-app {
+  @apply mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8;
+}
+
+/* Grid responsive */
+.grid-responsive {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+/* Flex helpers */
+.flex-center {
+  @apply flex items-center justify-center;
+}
+
+.flex-between {
+  @apply flex items-center justify-between;
+}
+
+/* ==================== MOBILE OPTIMIZATIONS ====================*/
+/* Optimisations pour le touch */
+@media (pointer: coarse) {
+  /* Augmenter la taille des zones de touch sur mobile */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Améliorer les boutons sur mobile */
+  button,
+  [role="button"] {
+    @apply touch-target;
+  }
+}
+
+/* Optimisations iOS */
+@supports (-webkit-touch-callout: none) {
+  /* Styles spécifiques iOS */
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prévenir le zoom sur les inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px; /* Empêche le zoom sur iOS */
+  }
+}
+
+/* ==================== PRINT STYLES ====================*/
+@media print {
+  /* Masquer les éléments non pertinents à l'impression */
+  .no-print,
+  nav,
+  .sidebar,
+  button,
+  .btn {
+    display: none !important;
+  }
+
+  /* Optimiser pour l'impression */
+  * {
+    color: black; background-color: white;
+  }
+
+  /* Éviter les coupures de page */
+  .print-together {
+    break-inside: avoid;
+  }
+}
+
+/* ==================== LOADING STATES ====================*/
+/* Skeleton loading */
+.skeleton {
+  @apply animate-pulse bg-gray-200 dark:bg-gray-700 rounded;
+}
+
+/* Shimmer effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #e5e7eb 0%,
+    #d1d5db 50%,
+    #e5e7eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(
+    90deg,
+    #374151 0%,
+    #4b5563 50%,
+    #374151 100%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* ==================== ERROR STYLES ====================*/
+/* État d'erreur */
+.error-state {
+  @apply text-danger-600 dark:text-danger-400;
+}
+
+.error-border {
+  @apply border-danger-300 dark:border-danger-600;
+}
+
+.error-bg {
+  @apply bg-danger-50 dark:bg-danger-900/20;
+}
+
+/* ==================== SUCCESS STYLES ====================*/
+/* État de succès */
+.success-state {
+  @apply text-success-600 dark:text-success-400;
+}
+
+.success-border {
+  @apply border-success-300 dark:border-success-600;
+}
+
+.success-bg {
+  @apply bg-success-50 dark:bg-success-900/20;
+}
+
+/* ==================== BLE STATUS STYLES ====================*/
+/* Styles spécifiques pour les statuts BLE */
+.ble-indicator {
+  @apply inline-block w-3 h-3 rounded-full;
+}
+
+.ble-indicator-connected {
+  @apply bg-ble-connected animate-pulse-ble;
+}
+
+.ble-indicator-connecting {
+  @apply bg-ble-connecting animate-pulse;
+}
+
+.ble-indicator-disconnected {
+  @apply bg-ble-disconnected;
+}
+
+.ble-indicator-error {
+  @apply bg-ble-error animate-bounce-subtle;
+}
+
+/* ==================== TRANSFER STATUS STYLES ====================*/
+/* Styles pour les statuts de transfert */
+.transfer-progress {
+  @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2;
+}
+
+.transfer-progress-bar {
+  @apply h-2 rounded-full transition-all duration-300 ease-out;
+}
+
+.transfer-progress-pending {
+  @apply bg-transfer-pending;
+}
+
+.transfer-progress-active {
+  @apply bg-transfer-active;
+}
+
+.transfer-progress-completed {
+  @apply bg-transfer-completed;
+}
+
+.transfer-progress-failed {
+  @apply bg-transfer-failed;
+}
+
+/* ==================== UTILITY CLASSES ====================*/
+/* Classes utilitaires personnalisées */
+.text-shadow {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.text-shadow-lg {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Truncate avec tooltip */
+.truncate-tooltip {
+  @apply truncate cursor-help;
+}
+
+/* Disabled state */
+.disabled {
+  @apply opacity-50 cursor-not-allowed pointer-events-none;
+}
+
+/* Glass effect */
+.glass {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* ==================== DEBUG STYLES ====================*/
+/* Styles pour le debug (développement uniquement) */
+.debug-border {
+  @apply border-2 border-red-500 border-dashed;
+}
+
+.debug-bg {
+  @apply bg-red-100/50 dark:bg-red-900/20;
+}
+
+/* Grille de debug */
+.debug-grid {
+  background-image:
+    linear-gradient(rgba(255, 0, 0, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
