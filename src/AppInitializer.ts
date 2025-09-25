@@ -1,3 +1,4 @@
+
 /**
  * App Initializer - Initialisation des services et configuration
  * Bootstrap centralisé de l'application TrackBee v2

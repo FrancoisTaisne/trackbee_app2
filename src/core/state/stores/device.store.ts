@@ -158,7 +158,7 @@ export const useDeviceStore = create<DeviceStore>()(
         set((state) => {
           state.machines.clear()
           machines.forEach(machine => {
-            state.machines.set(machine.id, machine)
+            state.machines.set(String(machine.id), machine)
           })
         })
 
@@ -172,7 +172,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       addMachine: (machine) => {
         set((state) => {
-          state.machines.set(machine.id, machine)
+          state.machines.set(String(machine.id), machine)
         })
 
         stateLog.debug('Machine added', { id: machine.id, name: machine.name })
@@ -180,7 +180,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       updateMachine: (id, updates) => {
         set((state) => {
-          const machine = state.machines.get(id)
+          const machine = state.machines.get(String(id))
           if (machine) {
             Object.assign(machine, updates)
           }
@@ -191,9 +191,9 @@ export const useDeviceStore = create<DeviceStore>()(
 
       removeMachine: (id) => {
         set((state) => {
-          state.machines.delete(id)
+          state.machines.delete(String(id))
           // Nettoyer aussi la connexion
-          state.connections.delete(id)
+          state.connections.delete(String(id))
         })
 
         stateLog.debug('Machine removed', { id })
@@ -209,7 +209,7 @@ export const useDeviceStore = create<DeviceStore>()(
         set((state) => {
           state.sites.clear()
           sites.forEach(site => {
-            state.sites.set(site.id, site)
+            state.sites.set(String(site.id), site)
           })
         })
 
@@ -223,7 +223,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       addSite: (site) => {
         set((state) => {
-          state.sites.set(site.id, site)
+          state.sites.set(String(site.id), site)
         })
 
         stateLog.debug('Site added', { id: site.id, name: site.name })
@@ -231,7 +231,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       updateSite: (id, updates) => {
         set((state) => {
-          const site = state.sites.get(id)
+          const site = state.sites.get(String(id))
           if (site) {
             Object.assign(site, updates)
           }
@@ -242,7 +242,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       removeSite: (id) => {
         set((state) => {
-          state.sites.delete(id)
+          state.sites.delete(String(id))
         })
 
         stateLog.debug('Site removed', { id })
@@ -258,7 +258,7 @@ export const useDeviceStore = create<DeviceStore>()(
         set((state) => {
           state.installations.clear()
           installations.forEach(installation => {
-            state.installations.set(installation.id, installation)
+            state.installations.set(String(installation.id), installation)
           })
         })
 
@@ -272,7 +272,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       addInstallation: (installation) => {
         set((state) => {
-          state.installations.set(installation.id, installation)
+          state.installations.set(String(installation.id), installation)
         })
 
         stateLog.debug('Installation added', { id: installation.id })
@@ -280,7 +280,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       updateInstallation: (id, updates) => {
         set((state) => {
-          const installation = state.installations.get(id)
+          const installation = state.installations.get(String(id))
           if (installation) {
             Object.assign(installation, updates)
           }
@@ -291,7 +291,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       removeInstallation: (id) => {
         set((state) => {
-          state.installations.delete(id)
+          state.installations.delete(String(id))
         })
 
         stateLog.debug('Installation removed', { id })
@@ -308,7 +308,7 @@ export const useDeviceStore = create<DeviceStore>()(
         set((state) => {
           state.campaigns.clear()
           campaigns.forEach(campaign => {
-            state.campaigns.set(campaign.id, campaign)
+            state.campaigns.set(String(campaign.id), campaign)
           })
         })
 
@@ -322,7 +322,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       addCampaign: (campaign) => {
         set((state) => {
-          state.campaigns.set(campaign.id, campaign)
+          state.campaigns.set(String(campaign.id), campaign)
         })
 
         stateLog.debug('Campaign added', { id: campaign.id, type: campaign.type })
@@ -330,7 +330,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       updateCampaign: (id, updates) => {
         set((state) => {
-          const campaign = state.campaigns.get(id)
+          const campaign = state.campaigns.get(String(id))
           if (campaign) {
             Object.assign(campaign, updates)
           }
@@ -341,7 +341,7 @@ export const useDeviceStore = create<DeviceStore>()(
 
       removeCampaign: (id) => {
         set((state) => {
-          state.campaigns.delete(id)
+          state.campaigns.delete(String(id))
         })
 
         stateLog.debug('Campaign removed', { id })

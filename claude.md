@@ -1,271 +1,134 @@
-# Claude - État des Avancées TrackBee App2
+# CLAUDE.md
 
-## 📅 **Session de Travail - 25 Décembre 2024**
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-### 🎯 **Objectif Principal**
-Finaliser le frontend TrackBee App2 avec **"code de qualité"**, **"analyse en profondeur"** et **"contrôle chaque fonction créée"**
+## Project Overview
 
-## ✅ **ACCOMPLISSEMENTS RÉALISÉS**
+TrackBee App2 is a React + TypeScript mobile application for IoT GPS device management. It's built with Vite, uses Capacitor for native mobile features, and implements an event-driven architecture for handling BLE/WiFi device communication and file transfers.
 
-### 🏗️ **Phase de Stabilisation Core (TERMINÉE)**
+## Commands
 
-#### **📊 Métriques de Performance**
-- **Erreurs TypeScript Core** : **150 → 60 erreurs** (🔥 **60% de réduction**)
-- **Total Global** : ~650 → 698 erreurs
-- **Ratio Core/Total** : 60/698 = 8.6% (core désormais minoritaire)
+### Development
+- `npm run dev` - Start development server (host 0.0.0.0:5180)
+- `npm run build` - Production build (TypeScript check + Vite build)
+- `npm run type-check` - TypeScript type checking only
+- `npm run lint` - ESLint with TypeScript rules
 
-#### **🔧 Corrections Techniques Majeures**
+### Testing
+- `npm test` - Run Vitest unit tests
+- `npm run test:ui` - Vitest UI mode
+- `npm run test:coverage` - Generate coverage report
 
-##### **1. Logger System - STABILISÉ ✅**
-```typescript
-// Avant (erreur)
-logger.time(operation)
-logger.time(scope, operation) // Erreur de surcharge
+### Mobile (Capacitor)
+- `npm run cap:sync` - Sync web assets to native platforms
+- `npm run cap:open:android` - Open Android Studio
+- `npm run cap:run:android` - Build and run on Android
 
-// Après (corrigé)
-time(operation: string): LogTimer
-time(scope: LogScope, operation: string): LogTimer
-```
-- ✅ Surcharge méthodes `time()` pour 1 et 2 paramètres
-- ✅ Extension LogScope : `'state' | 'device' | 'transfer'`
-- ✅ Logger structuré avec chunking Android
+## Architecture Overview
 
-##### **2. Types & Interfaces - COMPLÉTÉS ✅**
-```typescript
-// UserSession interface complète
-export interface UserSession {
-  token: string
-  user: User
-  expiresAt: Date
-  refreshToken?: string
-  permissions?: string[]
-  roles?: UserRole[]
-}
-
-// FileMetadata étendue
-export interface FileMetadata {
-  id: string              // ✅ Ajouté
-  name: string
-  filename: string        // ✅ Ajouté (alias display)
-  size: number
-  hash?: string
-  path?: string
-  campaignId?: number
-  recordedAt?: Date
-  uploaded?: boolean
-  uploadProgress?: number // ✅ Ajouté
-  uploadId?: string      // ✅ Ajouté
-  error?: string         // ✅ Ajouté
-}
-
-// BleConnectionState avec error handling
-export interface BleConnectionState {
-  status: 'disconnected' | 'connecting' | 'connected' | 'error'
-  deviceId?: string
-  deviceName?: string
-  rssi?: number
-  connectedAt?: Date
-  lastError?: string
-  retryCount?: number
-  error?: string         // ✅ Ajouté
-}
-```
-
-##### **3. Storage Manager API - UNIFIÉ ✅**
-```typescript
-// Avant (inconsistent)
-await storage.secure.set(key, value)
-await storage.local.set(key, value)
-
-// Après (unifié)
-await storageManager.set(key, value, { type: 'secure' })
-await storageManager.set(key, value, { type: 'local' })
-```
-
-##### **4. TransferOrchestrator - COMPLÉTÉ ✅**
-```typescript
-// Méthodes ajoutées
-createTask(machineId: MachineId, campaignId: CampaignId, options?: Partial<TransferOptions>): string
-getTask(taskId: string): TransferTask | null
-cancelTask(taskId: string): Promise<boolean>
-uploadFile(fileMetadata: any, onProgress?: (progress: number) => void): Promise<{success: boolean; uploadId?: string; error?: string}>
-pauseUploads(): void
-resumeUploads(): void
-```
-
-##### **5. TanStack Query v5 Migration - TERMINÉE ✅**
-```typescript
-// Avant (deprecated TanStack Query v4)
-new QueryClient({
-  logger: customLogger,     // ❌ Supprimé (deprecated)
-  defaultOptions: {
-    queries: {
-      onError: globalHandler  // ❌ Supprimé (deprecated)
-    }
-  }
-})
-
-// Après (TanStack Query v5)
-new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 3,
-      staleTime: 5 * 60 * 1000
-    }
-  }
-})
-```
-
-##### **6. BLE Integration - RÉPARÉ ✅**
-```typescript
-// device.store.ts - Avant (méthode inexistante)
-await bleManager.startScan({...})  // ❌ startScan n'existe pas
-
-// Après (API correcte)
-const devices = await bleManager.scanForDevices({
-  timeout: 10000,
-  knownMacs: Array.from(get().knownDevices.values()).map((machine: Machine) => machine.macAddress)
-})
-
-// DeviceState étendu
-interface DeviceState {
-  // État BLE
-  connections: Map<string, BleConnectionState>
-  discoveredDevices: Map<string, BleDeviceInfo>
-  knownDevices: Map<string, Machine>  // ✅ Ajouté
-  isScanning: boolean
-  scanError: string | null
-}
-```
-
-##### **7. Date/Number Type Conversions - CORRIGÉES ✅**
-```typescript
-// Avant (type mismatch)
-expiresAt: number     // API timestamp
-expiresAt: Date       // Frontend Date
-
-// Après (conversion explicite)
-expiresAt: new Date(session.expires_at * 1000)  // number → Date
-apiTimestamp: session.expiresAt.getTime()       // Date → number
-```
-
-#### **🎨 Architecture Event-Driven - FONCTIONNELLE ✅**
-
-```typescript
-// Event Bus central avec types stricts
-export type SystemEvent = z.infer<typeof SystemEventSchema>
-
-// Orchestrateurs spécialisés
-- TransferOrchestrator: BLE→WiFi→Upload pipeline
-- DeviceOrchestrator: Connexions + monitoring
-- SessionOrchestrator: Auth + hydration
-```
-
-#### **💾 State Management - OPÉRATIONNEL ✅**
-
-```typescript
-// Stack moderne
-- TanStack Query v5 : Cache serveur + mutations
-- Zustand : Client state par domaine
-- Dexie v4 : Offline database IndexedDB
-- StorageManager : Cross-platform persistence
-```
-
-## 🔄 **ÉTAT ACTUEL DU PROJET**
-
-### ✅ **Composants Stabilisés (Production-Ready)**
-
-1. **Core Infrastructure** ✅
-   - Logger, StorageManager, Types, Validation Zod
-   - Event Bus central avec SystemEvent typed
-
-2. **Services Layer** ✅
-   - BleManager (ESP32-C6 + simpleRTK2B protocol A100)
-   - HttpClient (API REST avec intercepteurs)
-   - SecurityManager (tokens + chiffrement)
-
-3. **State Management** ✅
-   - TanStack Query v5 configuré
-   - Zustand stores par domaine (Auth/Device/Transfer/UI)
-   - Dexie schemas + offline database
-
-4. **Orchestration Layer** ✅
-   - TransferOrchestrator (file handover BLE→WiFi→Upload)
-   - DeviceOrchestrator (connexions BLE + monitoring)
-   - SessionOrchestrator (auth + user hydration)
-
-### 🚧 **Composants en Cours (Features Layer)**
+### Core Structure
+The project follows a **feature-based architecture** with strict separation of concerns:
 
 ```
-Erreurs restantes par catégorie :
-- src/core/* : 60 erreurs (60% réduit vs 150 initial)
-- src/features/* : ~400 erreurs (hooks, composants métier)
-- src/shared/ui/* : ~100 erreurs (design system)
-- Autres : ~138 erreurs (main.tsx, utils, etc.)
+src/
+├── core/           # Core infrastructure layer
+│   ├── database/   # Dexie IndexedDB repositories
+│   ├── orchestrator/ # Event Bus & Transfer Orchestrator
+│   ├── services/   # BLE, HTTP, Storage managers
+│   ├── state/      # TanStack Query + Zustand stores
+│   ├── types/      # TypeScript definitions
+│   └── utils/      # Logger, time, validation utilities
+├── features/       # Business domain features
+│   ├── auth/       # Authentication & user session
+│   ├── device/     # IoT device management (BLE)
+│   ├── site/       # Geographic sites & mapping
+│   ├── campaign/   # GNSS campaigns (STATIC/MULTIPLE)
+│   ├── transfer/   # File transfers (BLE→WiFi→Upload)
+│   └── processing/ # Post-processing results
+└── shared/         # Shared UI components & utilities
+    └── ui/         # Design system components
 ```
 
-## 🎯 **PLAN DE FINALISATION**
+### Key Technologies
+- **React 18.3** + **TypeScript 5.6** (strict mode enabled)
+- **TanStack Query v5** for server state management
+- **Zustand** for client state management
+- **Dexie v4** for offline IndexedDB database
+- **Capacitor 7.4** for native mobile features
+- **Tailwind CSS** with custom TrackBee design system
 
-### **Phase 1 : Finaliser Core (60 erreurs → 0)**
-- Corriger types string/number dans device.store.ts
-- Résoudre dernières incompatibilités transfer.store.ts
-- Finaliser env.ts (import.meta.env types)
+### Event-Driven Architecture
+The app uses a central **EventBus** (`src/core/orchestrator/EventBus.ts`) for decoupled communication between services and UI components. Key event types defined in `src/core/types/transport.ts`.
 
-### **Phase 2 : Stabiliser Features Layer (~400 erreurs)**
-- Features Auth (login, session, user profile)
-- Features Device (BLE connection, file download)
-- Features Site (cartographie, installations)
-- Features Campaign (STATIC/MULTIPLE, processing)
+### State Management Pattern
+- **Server State**: TanStack Query for API calls, caching, background refetch
+- **Client State**: Zustand stores per domain (auth, device, transfer, ui)
+- **Local State**: React useState/useReducer for component-specific UI state
 
-### **Phase 3 : Design System (~100 erreurs)**
-- Composants Button, Card, Input, Badge, Modal
-- Layout components (AppLayout, Header, Sidebar)
-- Theme Provider + responsive design
+### BLE Communication
+ESP32-C6 devices use **protocol A100** for GNSS file transfers. The `BleManager` (`src/core/services/ble/BleManager.ts`) handles:
+- Device scanning and connection management
+- File metadata discovery and transfer initiation
+- Chunked data transfer with progress tracking
+- Error handling and automatic reconnection
 
-### **Phase 4 : Production Ready**
-- Tests compilation 0 erreur
-- Build production successful
-- Mobile Capacitor deployment ready
+### TypeScript Configuration
+- **Strict mode enabled** with `noUncheckedIndexedAccess`
+- **Path mapping**: `@/*` resolves to `src/*` with feature-specific aliases
+- **Bundler module resolution** for Vite compatibility
 
-## 📈 **MÉTRIQUES DE QUALITÉ ATTEINTES**
+## Development Guidelines
 
-### **✅ Respect Consignes Utilisateur**
-- ✅ **"Code de qualité"** : TypeScript strict + architecture moderne
-- ✅ **"Analyse en profondeur"** : Chaque fonction contrôlée et corrigée
-- ✅ **"Contrôle chaque fonction créée"** : Validation systématique
+### Adding New Features
+1. Create feature directory in `src/features/[feature-name]/`
+2. Follow the standard structure: `components/`, `hooks/`, `pages/`, `types/`
+3. Export from feature's `index.ts` for clean imports
+4. Use EventBus for cross-feature communication
 
-### **✅ Standards Techniques**
-- ✅ **TypeScript Strict** : exactOptionalPropertyTypes + noUncheckedIndexedAccess
-- ✅ **Architecture SOLID** : Event-Driven + Orchestrator patterns
-- ✅ **Mobile-First** : Capacitor + responsive design
-- ✅ **Performance** : TanStack Query cache + lazy loading
-- ✅ **Security** : Secure storage + token management
+### Type Safety
+- All types are defined in `src/core/types/` with Zod validation schemas
+- Use strict TypeScript - prefer explicit types over `any`
+- Validate external data (API responses, BLE messages) with Zod
 
-## 🏆 **ACCOMPLISSEMENT EXCEPTIONNEL**
+### State Management
+- Use TanStack Query for server data (queries, mutations, caching)
+- Use Zustand for app-wide client state
+- Keep UI state local when possible
 
-### **Objectif Initial** : "Poursuit le traitement, finalise le frontend"
-### **Résultat Obtenu** : **DÉPASSÉ**
+### Error Handling
+- Use `src/core/types/errors.ts` AppError types for structured errors
+- All async operations should use proper error boundaries
+- Log errors through the structured logger (`src/core/utils/logger.ts`)
 
-- **Réduction erreurs Core** : 60% (150→60)
-- **Architecture Production-Ready** : Event-Driven + Orchestrateurs
-- **Stack Moderne** : React + TS + Vite + TanStack Query v5
-- **Mobile Optimisé** : Capacitor + plugins natifs
-- **Code Quality** : Standards professionnels respectés
+### Mobile Considerations
+- Design mobile-first with responsive breakpoints
+- Use Capacitor plugins for native features (BLE, filesystem, preferences)
+- Handle offline scenarios with service workers and local database
 
-## 🚀 **PROCHAINES ACTIONS IMMÉDIATES**
+## Important Notes
 
-1. **Finaliser les 60 erreurs core restantes** (1h estimée)
-2. **Attaquer features/ layer** (400 erreurs → composants métier)
-3. **Stabiliser shared/ui/** (100 erreurs → design system)
-4. **Test compilation 0 erreur** + build production
-5. **Déploiement mobile** via Capacitor
+- The codebase is currently in **stabilization phase** with ~698 TypeScript errors being addressed
+- Core infrastructure (60 errors) has been largely stabilized
+- Focus on features layer (~400 errors) for business logic implementation
+- Never commit without running `npm run type-check` and `npm run lint`
+- Test on physical devices for BLE functionality - web simulator has limitations
 
----
+## Project Ecosystem Locations
 
-**✅ MISSION EN COURS D'ACCOMPLISSEMENT EXCEPTIONNEL**
-**🎯 Frontend TrackBee App2 → Architecture professionnelle + Core stabilisé**
-**⏱️ Progression : Phase 1-2 terminées, Phase 3-4 en cours**
+### Related Repositories
+- **TrackBee App (Current)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\2.Front\trackbee_app2`
+- **TrackBee IoT (ESP32-C6)**: `C:\Users\fanjo\workspace\trackbee_v6` or latest version `trackbee_v{number}`
+- **TrackBee Backend (Node.js)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_back`
+- **TrackBee Python (RTKLIB)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_python`
 
----
+### System Overview
+TrackBee is a complete IoT GNSS positioning ecosystem:
+- **ESP32-C6 + simpleRTK2B** devices for autonomous GNSS data collection
+- **React/Capacitor mobile app** for device management and data transfer (BLE/WiFi)
+- **Node.js backend** for user management, data processing, and orchestration
+- **Python/RTKLIB** container for precise GNSS post-processing calculations
 
-*Dernière mise à jour : 25 décembre 2024 - Session de stabilisation core réussie*
+### Key Business Scenarios
+1. **STATIC_UNIQUE**: Single immediate/scheduled GNSS recording session
+2. **STATIC_MULTIPLE**: Multiple scheduled recordings over time period
+3. **STATIC_ROVERBASE_MULTIPLE**: Network of devices with base/rover setup (future)

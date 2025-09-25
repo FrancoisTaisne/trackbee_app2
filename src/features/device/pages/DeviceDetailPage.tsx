@@ -1,7 +1,7 @@
 // @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * DeviceDetailPage Component - Page de détail d'un device IoT
- * Interface complète pour gérer un device: connexion, configuration, téléchargements, etc.
+ * Interface complète pour gérer un device : connexion, configuration, téléchargements, etc.
  */
 
 import React, { useState, useCallback } from 'react'
