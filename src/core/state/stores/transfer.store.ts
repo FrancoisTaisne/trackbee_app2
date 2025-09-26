@@ -11,6 +11,43 @@ import { stateLog, logger } from '@/core/utils/logger'
 import { transferOrchestrator } from '@/core/orchestrator/TransferOrchestrator'
 import { storageManager } from '@/core/services/storage/StorageManager'
 
+// Helper: normalize any orchestrator task/operation to a TransferTask shape
+function toTransferTask(taskId: string, src: any, fallback: { machineId: string | number, campaignId: string | number, files?: FileMetadata[] } = { machineId: '', campaignId: '' }): TransferTask {
+  const now = new Date()
+  const created = src?.createdAt ? new Date(src.createdAt) : now
+  const start = src?.startTime ? new Date(src.startTime) : created
+  const end = src?.endTime ? new Date(src.endTime) : undefined
+  const progress: TransferProgress = {
+    transferred: Number(src?.progress?.transferred) || 0,
+    total: Number(src?.progress?.total) || 0,
+    percentage: Number(src?.progress?.percentage) || 0,
+    speed: Number(src?.progress?.speed) || 0,
+    estimatedTimeRemaining: Number(src?.progress?.estimatedTimeRemaining) || 0
+  }
+  return {
+    // Identifiants
+    id: (src?.id ?? taskId) as string,
+    machineId: String(src?.machineId ?? fallback.machineId),
+    campaignId: Number(src?.campaignId ?? fallback.campaignId),
+
+    // Métadonnées
+    type: (src?.type ?? 'download'),
+    status: (src?.status ?? 'pending'),
+    priority: (src?.priority ?? 'normal'),
+
+    // Temps
+    createdAt: created,
+    updatedAt: now,
+    startTime: start,
+    endTime: end,
+
+    // I/O
+    progress,
+    files: (src?.files ?? fallback.files ?? []) as FileMetadata[]
+  } as TransferTask
+}
+
+
 // ==================== TYPES ====================
 
 interface TransferState {
@@ -156,13 +193,12 @@ export const useTransferStore = create<TransferStore>()(
           )
 
           // Ajouter à l'état local
-          const task = transferOrchestrator.getTask(taskId)
-          if (task) {
-            set((state) => {
-              state.activeTasks.set(taskId, task)
-              state.isTransferring = true
-            })
-          }
+          const raw = transferOrchestrator.getTask(taskId)
+          const task = toTransferTask(taskId, raw, { machineId: params.machineId, campaignId: params.campaignId, files: params.files })
+          set((state) => {
+            state.activeTasks.set(taskId, task)
+            state.isTransferring = true
+          })
 
           // Mettre à jour les stats
           get().updateStats()
@@ -360,7 +396,7 @@ export const useTransferStore = create<TransferStore>()(
         set((state) => {
           const task = state.activeTasks.get(taskId)
           if (task) {
-            Object.assign(task.progress, progress)
+            task.progress = { ...(task.progress ?? { transferred: 0, total: 0, percentage: 0, speed: 0, estimatedTimeRemaining: 0 }), ...progress }
 
             // Mettre à jour les totaux globaux
             const totalTransferred = Array.from(state.activeTasks.values())
