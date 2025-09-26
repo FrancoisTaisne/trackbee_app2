@@ -94,7 +94,10 @@ export class BleManager {
           await BleClient.requestEnable()
           bleLog.debug('BLE enable requested')
         } catch (error) {
-          bleLog.warn('BLE enable request failed (non-critical)', { error })
+          bleLog.info('⚠️ BLE not available - normal in web development', {
+            error: error instanceof Error ? error.message : 'BLE unavailable',
+            note: 'BLE functionality requires mobile device or special browser setup'
+          })
         }
       }
 

@@ -10,9 +10,15 @@ import App from './App'
 // Styles globaux
 import './index-minimal.css'
 
+// Configuration Immer pour les Maps et Sets
+import { enableMapSet } from 'immer'
+
 // Configuration et utilitaires
 import { appConfig } from '@/core/utils/env'
 import { stateLog } from '@/core/utils/logger'
+
+// Activer le support des Maps et Sets dans Immer
+enableMapSet()
 
 // ==================== ENVIRONMENT SETUP ====================
 

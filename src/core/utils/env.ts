@@ -28,6 +28,8 @@ interface AppConfig {
 
   // API endpoints
   api: {
+    enabled: boolean
+    baseUrl: string
     localUrl: string
     webUrl: string
     currentUrl: string
@@ -126,6 +128,8 @@ function createAppConfig(): AppConfig {
 
     // API configuration
     api: {
+      enabled: parseBoolean(import.meta.env.VITE_API_ENABLED, true),
+      baseUrl: currentUrl,
       localUrl,
       webUrl,
       currentUrl,

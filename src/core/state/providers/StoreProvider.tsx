@@ -26,6 +26,7 @@ interface StoreProviderProps {
 const useStoreInitialization = () => {
   const [isInitialized, setIsInitialized] = React.useState(false)
   const [initError, setInitError] = React.useState<Error | null>(null)
+  const cleanupExecutedRef = React.useRef(false)
 
   const authStore = useAuthStore()
   const deviceStore = useDeviceStore()
@@ -72,17 +73,42 @@ const useStoreInitialization = () => {
 
     initializeStores()
 
-    // Cleanup à la fermeture
+    // Cleanup à la fermeture avec protection contre les appels répétés
     return () => {
+      // Protection contre les appels multiples de cleanup
+      if (cleanupExecutedRef.current) {
+        return
+      }
+      cleanupExecutedRef.current = true
+
       stateLog.debug('🧹 Cleaning up stores...')
 
       try {
-        authStore.cleanup()
-        deviceStore.cleanup()
-        transferStore.cleanup()
-        uiStore.cleanup()
+        // Cleanup avec protection pour stores optionnels
+        if (authStore?.cleanup) {
+          authStore.cleanup()
+        }
+        if (deviceStore?.cleanup) {
+          deviceStore.cleanup()
+        }
+        if (transferStore?.cleanup) {
+          transferStore.cleanup()
+        }
+        if (uiStore?.cleanup) {
+          uiStore.cleanup()
+        }
+
+        stateLog.debug('✅ Store cleanup completed')
       } catch (error) {
-        stateLog.error('Error during store cleanup', { error })
+        // En cas d'erreur Immer MapSet, on ignore silencieusement pour éviter les loops
+        const errorMessage = error instanceof Error ? error.message : 'Unknown cleanup error'
+        if (errorMessage.includes('MapSet') || errorMessage.includes('Immer')) {
+          stateLog.debug('🔇 Ignoring Immer MapSet cleanup error (non-critical)')
+        } else {
+          stateLog.warn('⚠️ Non-critical error during store cleanup', {
+            error: errorMessage
+          })
+        }
       }
     }
   }, [authStore, deviceStore, transferStore, uiStore])

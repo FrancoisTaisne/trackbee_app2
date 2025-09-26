@@ -185,15 +185,20 @@ export class AppInitializer {
       const isOnline = navigator.onLine
       stateLog.debug('Network status', { isOnline })
 
-      // Tester l'API si en ligne
-      if (isOnline) {
+      // Tester l'API si en ligne (optionnel en développement)
+      if (isOnline && appConfig.api.enabled) {
         try {
-          const pingResult = await httpClient.ping({ timeoutMs: 5000 })
-          stateLog.debug('API connectivity test', pingResult)
+          const pingResult = await httpClient.ping({ timeoutMs: 3000 })
+          stateLog.debug('✅ API connectivity test successful', pingResult)
         } catch (error) {
-          stateLog.warn('API ping failed', { error })
-          // Ne pas faire échouer l'init pour ça
+          stateLog.info('⚠️ API not available - continuing in offline mode', {
+            apiUrl: appConfig.api.baseUrl,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+          // Ne pas faire échouer l'init pour ça - mode offline
         }
+      } else {
+        stateLog.info('⚠️ API disabled or offline - running in offline mode')
       }
 
       timer.end({ success: true })
