@@ -27,6 +27,7 @@ const useStoreInitialization = () => {
   const [isInitialized, setIsInitialized] = React.useState(false)
   const [initError, setInitError] = React.useState<Error | null>(null)
   const cleanupExecutedRef = React.useRef(false)
+  const initializationStartedRef = React.useRef(false)
 
   const authStore = useAuthStore()
   const deviceStore = useDeviceStore()
@@ -34,6 +35,12 @@ const useStoreInitialization = () => {
   const uiStore = useUIStore()
 
   React.useEffect(() => {
+    // Protection contre les initialisations multiples
+    if (initializationStartedRef.current) {
+      return
+    }
+    initializationStartedRef.current = true
+
     const initializeStores = async () => {
       const timer = logger.time('state', 'Store initialization')
 
@@ -111,7 +118,7 @@ const useStoreInitialization = () => {
         }
       }
     }
-  }, [authStore, deviceStore, transferStore, uiStore])
+  }, []) // Pas de dépendances - l'effet ne s'exécute qu'au mount
 
   return { isInitialized, initError }
 }
@@ -212,7 +219,7 @@ const useStoreSynchronization = () => {
       unsubscribeDevice()
       unsubscribeUI()
     }
-  }, [authStore, deviceStore, transferStore, uiStore])
+  }, []) // Pas de dépendances - l'effet de sync ne s'exécute qu'au mount
 }
 
 // ==================== ERROR BOUNDARY ====================

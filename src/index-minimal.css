@@ -1,4 +1,7 @@
-/* TrackBee App v2 - Minimal CSS for production build */
+/* TrackBee App v2 - Styles avec Tailwind CSS */
+
+/* Import Tailwind CSS */
+@import "tailwindcss";
 
 /* Reset CSS basic */
 * {

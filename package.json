@@ -58,6 +58,8 @@
     "@capacitor/cli": "^7.4.2",
     "@capacitor/status-bar": "^7.0.2",
     "@eslint/js": "^9.25.0",
+    "@headlessui/tailwindcss": "^0.2.2",
+    "@tailwindcss/forms": "^0.5.10",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",
     "@testing-library/user-event": "^14.5.2",

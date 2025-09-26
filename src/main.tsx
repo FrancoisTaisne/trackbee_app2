@@ -7,8 +7,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 
-// Styles globaux
-import './index-minimal.css'
+// Styles globaux avec Tailwind CSS
+import './index.css'
 
 // Configuration Immer pour les Maps et Sets
 import { enableMapSet } from 'immer'

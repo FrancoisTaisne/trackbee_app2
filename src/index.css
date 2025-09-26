@@ -2,9 +2,7 @@
  * TrackBee App v2 - Styles Globaux
  * Configuration CSS avec TailwindCSS et variables personnalisées
  */
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@import "tailwindcss";
 
 
 /* ==================== FONTS ====================*/
