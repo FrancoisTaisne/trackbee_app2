@@ -4,6 +4,7 @@
  */
 
 import { httpClient } from '../HttpClient'
+import { storageManager } from '@/core/services/storage/StorageManager'
 import { API_ENDPOINTS } from '../endpoints'
 import { appConfig } from '@/core/utils/env'
 import type {
@@ -52,6 +53,8 @@ export interface UserHydrationData {
   machines: any[]
   sites: any[]
   installations: any[]
+  campaigns?: any[]
+  calculations?: any[]
 }
 
 // ==================== AUTH SERVICE ====================
@@ -59,6 +62,8 @@ export interface UserHydrationData {
 export class AuthService {
   // Stockage temporaire des données de login pour l'hydratation
   private static lastLoginData: any = null
+  private static readonly HYDRATE_CACHE_KEY = 'hydrate_cache'
+  private static readonly HYDRATE_ETAG_KEY = 'hydrate_etag'
 
   /**
    * Connexion utilisateur
@@ -116,7 +121,7 @@ export class AuthService {
 
     // Check roles in order of precedence
     if (roles.includes('ROLE_ADMIN')) return 'admin'
-    if (roles.includes('ROLE_MODERATOR')) return 'admin' // Map moderator to admin for now
+    if (roles.includes('ROLE_MODERATOR')) return 'moderator' // Fix: map moderator correctly
     if (roles.includes('ROLE_VIEWER')) return 'viewer'
     return 'user'
   }
@@ -205,13 +210,38 @@ export class AuthService {
   }
 
   /**
-   * Hydratation des données utilisateur depuis la réponse de login
-   * Le backend retourne déjà toutes les données nécessaires lors du login
+   * Hydratation des données utilisateur depuis le backend
+   * Utilise l'endpoint /api/me/hydrate pour récupérer toutes les données
    */
   static async hydrate(): Promise<UserHydrationData> {
-    // Note: Cette méthode sera appelée après login avec les données déjà disponibles
-    // Pour l'instant, on utilise une approche de re-login pour récupérer les données
-    throw new Error('Hydrate should be called with login data, not as separate API call')
+    try {
+      const endpoint = '/api/me/hydrate?includeCampaigns=1&includeCalculations=1'
+      const prevEtag = await storageManager.getWithFallback<string>(this.HYDRATE_ETAG_KEY)
+      const headers = prevEtag?.value ? { 'If-None-Match': prevEtag.value } : undefined
+      const resp = await httpClient.getWithMeta<any>(endpoint, { headers })
+
+      if (resp.status === 304) {
+        const cached = await storageManager.getWithFallback<any>(this.HYDRATE_CACHE_KEY)
+        if (cached?.value) {
+          return this.extractHydrationData(cached.value)
+        }
+        throw new Error('304 received but no cached hydration data available')
+      }
+
+      if (!resp.data) {
+        throw new Error('No data in hydrate response')
+      }
+
+      const etag = resp.headers['etag']
+      if (etag) await storageManager.setWithFallback(this.HYDRATE_ETAG_KEY, etag)
+      await storageManager.setWithFallback(this.HYDRATE_CACHE_KEY, resp.data)
+
+      return this.extractHydrationData(resp.data)
+
+    } catch (error) {
+      console.error('❌ Hydratation failed:', error)
+      throw new Error(`Hydration failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   /**
@@ -255,8 +285,9 @@ export class AuthService {
           lat: site.lat ? parseFloat(site.lat) : undefined,
           lng: site.lon ? parseFloat(site.lon) : undefined, // Backend utilise "lon"
           altitude: site.altitude ? parseFloat(site.altitude) : undefined,
-          isActive: true,
-          ownership: 'owned', // Marquer le type de propriété
+          ownership: 'owner',
+          sharedRole: undefined,
+          isPublic: false,
           createdAt: site.createdAt || new Date().toISOString(),
           updatedAt: site.updatedAt || new Date().toISOString()
         })
@@ -276,8 +307,8 @@ export class AuthService {
               lat: site.lat ? parseFloat(site.lat) : undefined,
               lng: site.lon ? parseFloat(site.lon) : undefined,
               altitude: site.altitude ? parseFloat(site.altitude) : undefined,
-              isActive: true,
-              ownership: `shared_${role}`, // Marquer le type de partage
+              ownership: 'shared',
+              sharedRole: role as 'viewer' | 'editor',
               ownerId: site.owner?.id,
               ownerEmail: site.owner?.email,
               createdAt: site.createdAt || new Date().toISOString(),
@@ -339,6 +370,37 @@ export class AuthService {
 
     const installations = Array.from(installationsMap.values())
 
+    // ==================== CAMPAIGNS & CALCULATIONS ====================
+    const rawCampaigns = Array.isArray(backendLoginData.campaigns) ? backendLoginData.campaigns : []
+    const campaigns = rawCampaigns.map((c: any) => ({
+      id: c.id,
+      siteId: c.siteId,
+      machineId: c.machineId,
+      installationId: c.installationId,
+      name: c.title || c.seriesRef || `C-${c.id}`,
+      description: c.notes || '',
+      type: c.strategy || (c.pos_mode === 'kinematic' ? 'kinematic' : 'static_multiple'),
+      status: c.status || 'active',
+      scheduledAt: c.planned_start ? new Date(c.planned_start) : undefined,
+      createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
+      updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
+    }))
+
+    const rawCalcs = Array.isArray(backendLoginData.calculations) ? backendLoginData.calculations : []
+    const calculations = rawCalcs.map((p: any) => ({
+      id: p.id,
+      campaignId: p.campaignId,
+      siteId: p.siteId,
+      machineId: p.machineId,
+      installationId: p.installationId,
+      status: p.status || 'queued',
+      type: p.pos_mode === 'kinematic' ? 'kinematic' : 'static_multiple',
+      createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+      updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
+      processingStartedAt: p.startedAt ? new Date(p.startedAt) : undefined,
+      processingCompletedAt: p.completedAt ? new Date(p.completedAt) : undefined
+    }))
+
     console.log('✅ Hydration data extracted:', {
       machines: machines.length,
       sites: sites.length,
@@ -350,11 +412,7 @@ export class AuthService {
       }
     })
 
-    return {
-      machines,
-      sites,
-      installations
-    }
+    return { machines, sites, installations, campaigns, calculations }
   }
 
   /**

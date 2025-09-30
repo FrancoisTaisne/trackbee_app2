@@ -175,6 +175,32 @@ export class HttpClient {
   }
 
   /**
+   * GET request returning meta (status, headers) alongside data.
+   * Useful for cache negotiation (e.g., ETag/If-None-Match).
+   */
+  async getWithMeta<T = any>(url: string, options: RequestOptions = {}): Promise<{ data: T; status: number; headers: Record<string, string> }> {
+    const { useCapacitor = detectPlatform().isCapacitor, skipAuth = false, customTimeout = 10000, ...axiosOptions } = options
+
+    if (!skipAuth) {
+      const token = await this.tokenManager.getToken()
+      if (token) {
+        axiosOptions.headers = { ...(axiosOptions.headers || {}), 'x-access-token': token }
+      }
+    }
+
+    axiosOptions.timeout = customTimeout
+
+    const resp = useCapacitor
+      ? await this.capacitorRequest({ ...axiosOptions, method: 'GET', url })
+      : await this.axiosInstance.request({ ...axiosOptions, method: 'GET', url })
+
+    const headers: Record<string, string> = {}
+    Object.entries(resp.headers || {}).forEach(([k, v]) => { headers[k.toLowerCase()] = Array.isArray(v) ? v.join(', ') : String(v) })
+
+    return { data: resp.data as T, status: resp.status, headers }
+  }
+
+  /**
    * POST request
    */
   async post<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<ApiResponse<T>> {

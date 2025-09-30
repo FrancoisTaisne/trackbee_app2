@@ -47,6 +47,7 @@ interface AuthState {
   isHydrated: boolean
   lastHydration: Date | null
   hydrationError: string | null
+  hydratedData: UserHydrationData | null
 }
 
 interface AuthActions {
@@ -101,7 +102,8 @@ const initialState: AuthState = {
 
   isHydrated: false,
   lastHydration: null,
-  hydrationError: null
+  hydrationError: null,
+  hydratedData: null
 }
 
 // ==================== STORAGE KEYS ====================
@@ -150,10 +152,10 @@ export const useAuthStore = create<AuthStore>()(
             roles: [userRole] // Convert single role to array for compatibility
           }
 
-          // Stocker les données de session
+          // Stocker les données de session (avec fallback pour le web)
           await Promise.all([
-            storageManager.set(STORAGE_KEYS.SESSION, session, { type: 'secure' }),
-            storageManager.set(STORAGE_KEYS.TOKEN, token, { type: 'secure' }),
+            storageManager.setWithFallback(STORAGE_KEYS.SESSION, session),
+            storageManager.setWithFallback(STORAGE_KEYS.TOKEN, token),
             storageManager.set(STORAGE_KEYS.USER, user),
             storageManager.set(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString())
           ])
@@ -259,10 +261,10 @@ export const useAuthStore = create<AuthStore>()(
             roles: [userRole]
           }
 
-          // Store session data
+          // Store session data (with fallback for web)
           await Promise.all([
-            storageManager.set(STORAGE_KEYS.SESSION, session, { type: 'secure' }),
-            storageManager.set(STORAGE_KEYS.TOKEN, token, { type: 'secure' }),
+            storageManager.setWithFallback(STORAGE_KEYS.SESSION, session),
+            storageManager.setWithFallback(STORAGE_KEYS.TOKEN, token),
             storageManager.set(STORAGE_KEYS.USER, user),
             storageManager.set(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString())
           ])
@@ -325,12 +327,22 @@ export const useAuthStore = create<AuthStore>()(
             }
           }
 
-          // Nettoyer le storage
+          // Nettoyer le storage (multi-backend pour robustesse)
+          const safeRemove = async (key: string) => {
+            // Tenter sur plusieurs backends sans échouer globalement
+            for (const type of ['secure', 'preferences', 'local'] as const) {
+              try {
+                // @ts-expect-error: type is narrowed above
+                await storageManager.remove(key, { type })
+              } catch {}
+            }
+          }
+
           await Promise.all([
-            storageManager.remove(STORAGE_KEYS.SESSION, { type: 'secure' }),
-            storageManager.remove(STORAGE_KEYS.TOKEN, { type: 'secure' }),
-            storageManager.remove(STORAGE_KEYS.USER),
-            storageManager.remove(STORAGE_KEYS.LAST_ACTIVITY)
+            safeRemove(STORAGE_KEYS.SESSION),
+            safeRemove(STORAGE_KEYS.TOKEN),
+            safeRemove(STORAGE_KEYS.USER),
+            safeRemove(STORAGE_KEYS.LAST_ACTIVITY)
           ])
 
           // Nettoyer le client HTTP
@@ -374,10 +386,10 @@ export const useAuthStore = create<AuthStore>()(
             expiresAt: new Date(expiresAt)
           }
 
-          // Stocker les nouvelles données
+          // Stocker les nouvelles données (avec fallback web)
           await Promise.all([
-            storageManager.set(STORAGE_KEYS.SESSION, updatedSession, { type: 'secure' }),
-            storageManager.set(STORAGE_KEYS.TOKEN, token, { type: 'secure' })
+            storageManager.setWithFallback(STORAGE_KEYS.SESSION, updatedSession),
+            storageManager.setWithFallback(STORAGE_KEYS.TOKEN, token)
           ])
 
           // Configurer le nouveau token
@@ -436,7 +448,7 @@ export const useAuthStore = create<AuthStore>()(
         // Persister les changements
         const session = get().session
         if (session) {
-          storageManager.set(STORAGE_KEYS.SESSION, session, { type: 'secure' }).catch((error: any) => {
+          storageManager.setWithFallback(STORAGE_KEYS.SESSION, session).catch((error: any) => {
             stateLog.error('Failed to persist session update', { error })
           })
         }
@@ -506,13 +518,16 @@ export const useAuthStore = create<AuthStore>()(
             }
           }
 
-          // Charger les données persistées
-          const [session, token, user, lastActivity] = await Promise.all([
-            storageManager.get<UserSession>(STORAGE_KEYS.SESSION, { type: 'secure' }),
-            storageManager.get<string>(STORAGE_KEYS.TOKEN, { type: 'secure' }),
+          // Charger les données persistées (avec fallback)
+          const [sessionRes, tokenRes, user, lastActivity] = await Promise.all([
+            storageManager.getWithFallback<UserSession>(STORAGE_KEYS.SESSION),
+            storageManager.getWithFallback<string>(STORAGE_KEYS.TOKEN),
             storageManager.get<User>(STORAGE_KEYS.USER),
             storageManager.get<string>(STORAGE_KEYS.LAST_ACTIVITY)
           ])
+
+          const session = sessionRes?.value || null
+          const token = tokenRes?.value || null
 
           if (session && token && user) {
             // Restaurer les dates depuis les chaînes JSON
@@ -585,16 +600,26 @@ export const useAuthStore = create<AuthStore>()(
           stateLog.debug('📦 Hydration data received', {
             machines: hydrationData.machines?.length || 0,
             sites: hydrationData.sites?.length || 0,
-            installation: !!hydrationData.installation
+            installations: hydrationData.installations?.length || 0
           })
 
           // Stocker en IndexedDB de manière sécurisée
           await database.transaction('rw', [database.machines, database.sites, database.installations], async () => {
             // Stocker les machines
             if (hydrationData.machines && Array.isArray(hydrationData.machines)) {
-              for (const machine of hydrationData.machines) {
+              for (const m of hydrationData.machines) {
                 await database.machines.put({
-                  ...machine,
+                  id: m.id,
+                  name: m.name || 'Machine',
+                  macAddress: m.macAddress || (m as any).macD,
+                  model: m.model || 'trackbee',
+                  description: m.description || '',
+                  type: m.type || 'trackbee',
+                  isActive: m.isActive !== false,
+                  lastConnectionState: { status: m.isActive ? 'connected' : 'disconnected' },
+                  lastSeenAt: new Date(),
+                  createdAt: (m as any).createdAt || new Date().toISOString(),
+                  updatedAt: (m as any).updatedAt || new Date().toISOString(),
                   syncedAt: new Date()
                 })
               }
@@ -624,6 +649,13 @@ export const useAuthStore = create<AuthStore>()(
 
           // Sauvegarder la date de dernière synchronisation
           await database.saveAppState('lastDataSync', new Date())
+          // Mémoriser en store (mémoire) l'hydratation
+          set((state) => {
+            state.isHydrated = true
+            state.lastHydration = new Date()
+            state.hydrationError = null
+            state.hydratedData = hydrationData
+          })
 
           timer.end({ success: true })
           stateLog.info('✅ User data hydration completed', {
@@ -673,45 +705,53 @@ export const useAuthStore = create<AuthStore>()(
 
             // Stocker les sites
             if (hydrationData.sites && Array.isArray(hydrationData.sites)) {
-              for (const site of hydrationData.sites) {
+              for (const s of hydrationData.sites) {
                 await database.sites.put({
-                  id: site.id,
-                  name: site.name,
-                  description: site.description || '',
-                  address: site.address || '',
-                  lat: site.lat || undefined,
-                  lng: site.lon || site.lng || undefined,
-                  altitude: site.altitude || undefined,
-                  isActive: true,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  id: s.id,
+                  name: s.name,
+                  description: s.description || '',
+                  address: (s as any).address || '',
+                  lat: s.lat ?? undefined,
+                  lng: (s as any).lng ?? undefined,
+                  altitude: (s as any).altitude ?? undefined,
+                  ownership: (s as any).ownership === 'owned' ? 'owner' : 'shared',
+                  sharedRole: (s as any).ownership?.startsWith?.('shared_') ? ((s as any).ownership.split('_')[1]) : (s as any).sharedRole,
+                  isPublic: false,
+                  createdAt: (s as any).createdAt || new Date().toISOString(),
+                  updatedAt: (s as any).updatedAt || new Date().toISOString(),
                   syncedAt: new Date()
-                })
+                } as any)
               }
             }
 
             // Stocker toutes les installations
             if (hydrationData.installations && Array.isArray(hydrationData.installations)) {
-              for (const installation of hydrationData.installations) {
+              for (const inst of hydrationData.installations) {
+                const createdAt = (inst as any).installedAt || (inst as any).createdAt || new Date().toISOString()
+                const updatedAt = (inst as any).updatedAt || createdAt
                 await database.installations.put({
-                  id: installation.id,
-                  machineId: installation.machineId,
-                  siteId: installation.siteId,
-                  installationRef: installation.installationRef || '',
-                  positionIndex: installation.positionIndex || 1,
-                  installedAt: new Date(installation.installedAt || new Date()),
-                  uninstalledAt: installation.uninstalledAt ? new Date(installation.uninstalledAt) : null,
-                  isActive: !installation.uninstalledAt,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
+                  id: inst.id,
+                  machineId: inst.machineId,
+                  siteId: inst.siteId,
+                  positionIndex: inst.positionIndex || 1,
+                  isActive: (inst as any).uninstalledAt ? false : true,
+                  createdAt: typeof createdAt === 'string' ? createdAt : new Date(createdAt).toISOString(),
+                  updatedAt: typeof updatedAt === 'string' ? updatedAt : new Date(updatedAt).toISOString(),
                   syncedAt: new Date()
-                })
+                } as any)
               }
             }
           })
 
           // Sauvegarder la date de dernière synchronisation
           await database.saveAppState('lastDataSync', new Date())
+          // Mémoriser en store (mémoire) l'hydratation
+          set((state) => {
+            state.isHydrated = true
+            state.lastHydration = new Date()
+            state.hydrationError = null
+            state.hydratedData = hydrationData
+          })
 
           timer.end({ success: true })
           stateLog.info('✅ User data hydration with data completed', {
