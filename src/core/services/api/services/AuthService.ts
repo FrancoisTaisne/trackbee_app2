@@ -4,9 +4,9 @@
  */
 
 import { httpClient } from '../HttpClient'
-import { storageManager } from '@/core/services/storage/StorageManager'
 import { API_ENDPOINTS } from '../endpoints'
 import { appConfig } from '@/core/utils/env'
+import { HydrationService, type HydrationData } from '@/core/services/hydration/HydrationService'
 import type {
   User,
   LoginCredentials,
@@ -49,21 +49,13 @@ export interface MachineLoginResponse {
   expiresAt: string
 }
 
-export interface UserHydrationData {
-  machines: any[]
-  sites: any[]
-  installations: any[]
-  campaigns?: any[]
-  calculations?: any[]
-}
+export type UserHydrationData = HydrationData
 
 // ==================== AUTH SERVICE ====================
 
 export class AuthService {
   // Stockage temporaire des données de login pour l'hydratation
   private static lastLoginData: any = null
-  private static readonly HYDRATE_CACHE_KEY = 'hydrate_cache'
-  private static readonly HYDRATE_ETAG_KEY = 'hydrate_etag'
 
   /**
    * Connexion utilisateur
@@ -215,29 +207,7 @@ export class AuthService {
    */
   static async hydrate(): Promise<UserHydrationData> {
     try {
-      const endpoint = '/api/me/hydrate?includeCampaigns=1&includeCalculations=1'
-      const prevEtag = await storageManager.getWithFallback<string>(this.HYDRATE_ETAG_KEY)
-      const headers = prevEtag?.value ? { 'If-None-Match': prevEtag.value } : undefined
-      const resp = await httpClient.getWithMeta<any>(endpoint, { headers })
-
-      if (resp.status === 304) {
-        const cached = await storageManager.getWithFallback<any>(this.HYDRATE_CACHE_KEY)
-        if (cached?.value) {
-          return this.extractHydrationData(cached.value)
-        }
-        throw new Error('304 received but no cached hydration data available')
-      }
-
-      if (!resp.data) {
-        throw new Error('No data in hydrate response')
-      }
-
-      const etag = resp.headers['etag']
-      if (etag) await storageManager.setWithFallback(this.HYDRATE_ETAG_KEY, etag)
-      await storageManager.setWithFallback(this.HYDRATE_CACHE_KEY, resp.data)
-
-      return this.extractHydrationData(resp.data)
-
+      return await HydrationService.fetch()
     } catch (error) {
       console.error('❌ Hydratation failed:', error)
       throw new Error(`Hydration failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -249,170 +219,7 @@ export class AuthService {
    * Version améliorée avec déduplication et mapping correct
    */
   static extractHydrationData(backendLoginData: any): UserHydrationData {
-    console.log('🔄 Extracting hydration data...', {
-      machinesCount: backendLoginData.machines?.length || 0,
-      sitesOwned: backendLoginData.sites?.owned?.length || 0,
-      sitesSharedViewer: backendLoginData.sites?.shared?.viewer?.length || 0,
-      sitesSharedEditor: backendLoginData.sites?.shared?.editor?.length || 0
-    })
-
-    // ==================== MACHINES ====================
-    const machines = (backendLoginData.machines || []).map((machine: any) => ({
-      id: machine.id,
-      name: machine.name || `Machine ${machine.macD}`,
-      macAddress: machine.macD, // Backend utilise "macD"
-      model: machine.model || 'TrackBee',
-      description: machine.description || '',
-      type: machine.type || 'trackbee',
-      isActive: machine.status === true,
-      lastConnectionState: machine.status ? 'connected' : 'disconnected',
-      lastSeenAt: machine.lastSeenAt || new Date().toISOString(),
-      createdAt: machine.createdAt || new Date().toISOString(),
-      updatedAt: machine.updatedAt || new Date().toISOString()
-    }))
-
-    // ==================== SITES AVEC DÉDUPLICATION ====================
-    const sitesMap = new Map() // Pour éviter les doublons
-
-    // Ajouter les sites owned
-    if (backendLoginData.sites?.owned) {
-      backendLoginData.sites.owned.forEach((site: any) => {
-        sitesMap.set(site.id, {
-          id: site.id,
-          name: site.name,
-          description: site.description || '',
-          address: site.address || '',
-          lat: site.lat ? parseFloat(site.lat) : undefined,
-          lng: site.lon ? parseFloat(site.lon) : undefined, // Backend utilise "lon"
-          altitude: site.altitude ? parseFloat(site.altitude) : undefined,
-          ownership: 'owner',
-          sharedRole: undefined,
-          isPublic: false,
-          createdAt: site.createdAt || new Date().toISOString(),
-          updatedAt: site.updatedAt || new Date().toISOString()
-        })
-      })
-    }
-
-    // Ajouter les sites shared (sans doublons)
-    ['viewer', 'editor'].forEach(role => {
-      if (backendLoginData.sites?.shared?.[role]) {
-        backendLoginData.sites.shared[role].forEach((site: any) => {
-          if (!sitesMap.has(site.id)) { // Éviter doublons
-            sitesMap.set(site.id, {
-              id: site.id,
-              name: site.name,
-              description: site.description || '',
-              address: site.address || '',
-              lat: site.lat ? parseFloat(site.lat) : undefined,
-              lng: site.lon ? parseFloat(site.lon) : undefined,
-              altitude: site.altitude ? parseFloat(site.altitude) : undefined,
-              ownership: 'shared',
-              sharedRole: role as 'viewer' | 'editor',
-              ownerId: site.owner?.id,
-              ownerEmail: site.owner?.email,
-              createdAt: site.createdAt || new Date().toISOString(),
-              updatedAt: site.updatedAt || new Date().toISOString()
-            })
-          }
-        })
-      }
-    })
-
-    const sites = Array.from(sitesMap.values())
-
-    // ==================== INSTALLATIONS AVEC DÉDUPLICATION ====================
-    const installationsMap = new Map()
-
-    // Installations depuis les machines
-    machines.forEach((machine: any, originalIndex: number) => {
-      const originalMachine = backendLoginData.machines[originalIndex]
-      if (originalMachine.installation) {
-        const inst = originalMachine.installation
-        installationsMap.set(inst.id, {
-          id: inst.id,
-          machineId: machine.id,
-          siteId: inst.siteId,
-          installationRef: inst.installationRef || '',
-          positionIndex: inst.positionIndex || 1,
-          installedAt: inst.installedAt || new Date().toISOString(),
-          uninstalledAt: inst.uninstalledAt || null,
-          isActive: !inst.uninstalledAt,
-          source: 'machine', // Pour debug
-          createdAt: inst.createdAt || inst.installedAt || new Date().toISOString(),
-          updatedAt: inst.updatedAt || new Date().toISOString()
-        })
-      }
-    })
-
-    // Installations depuis les sites (sans doublons)
-    ;[...(backendLoginData.sites?.owned || []), ...(backendLoginData.sites?.shared?.viewer || []), ...(backendLoginData.sites?.shared?.editor || [])].forEach((site: any) => {
-      if (site.installations) {
-        site.installations.forEach((inst: any) => {
-          if (!installationsMap.has(inst.id)) { // Éviter doublons
-            installationsMap.set(inst.id, {
-              id: inst.id,
-              machineId: inst.machineId,
-              siteId: inst.siteId,
-              installationRef: inst.installationRef || '',
-              positionIndex: inst.positionIndex || 1,
-              installedAt: inst.installedAt || new Date().toISOString(),
-              uninstalledAt: inst.uninstalledAt || null,
-              isActive: !inst.uninstalledAt,
-              source: 'site', // Pour debug
-              createdAt: inst.createdAt || inst.installedAt || new Date().toISOString(),
-              updatedAt: inst.updatedAt || new Date().toISOString()
-            })
-          }
-        })
-      }
-    })
-
-    const installations = Array.from(installationsMap.values())
-
-    // ==================== CAMPAIGNS & CALCULATIONS ====================
-    const rawCampaigns = Array.isArray(backendLoginData.campaigns) ? backendLoginData.campaigns : []
-    const campaigns = rawCampaigns.map((c: any) => ({
-      id: c.id,
-      siteId: c.siteId,
-      machineId: c.machineId,
-      installationId: c.installationId,
-      name: c.title || c.seriesRef || `C-${c.id}`,
-      description: c.notes || '',
-      type: c.strategy || (c.pos_mode === 'kinematic' ? 'kinematic' : 'static_multiple'),
-      status: c.status || 'active',
-      scheduledAt: c.planned_start ? new Date(c.planned_start) : undefined,
-      createdAt: c.createdAt ? new Date(c.createdAt) : new Date(),
-      updatedAt: c.updatedAt ? new Date(c.updatedAt) : new Date()
-    }))
-
-    const rawCalcs = Array.isArray(backendLoginData.calculations) ? backendLoginData.calculations : []
-    const calculations = rawCalcs.map((p: any) => ({
-      id: p.id,
-      campaignId: p.campaignId,
-      siteId: p.siteId,
-      machineId: p.machineId,
-      installationId: p.installationId,
-      status: p.status || 'queued',
-      type: p.pos_mode === 'kinematic' ? 'kinematic' : 'static_multiple',
-      createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
-      updatedAt: p.updatedAt ? new Date(p.updatedAt) : new Date(),
-      processingStartedAt: p.startedAt ? new Date(p.startedAt) : undefined,
-      processingCompletedAt: p.completedAt ? new Date(p.completedAt) : undefined
-    }))
-
-    console.log('✅ Hydration data extracted:', {
-      machines: machines.length,
-      sites: sites.length,
-      installations: installations.length,
-      sitesBreakdown: {
-        owned: sites.filter(s => s.ownership === 'owned').length,
-        sharedViewer: sites.filter(s => s.ownership === 'shared_viewer').length,
-        sharedEditor: sites.filter(s => s.ownership === 'shared_editor').length
-      }
-    })
-
-    return { machines, sites, installations, campaigns, calculations }
+    return HydrationService.parse(backendLoginData)
   }
 
   /**

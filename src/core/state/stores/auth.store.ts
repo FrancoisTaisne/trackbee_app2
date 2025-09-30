@@ -11,6 +11,7 @@ import { stateLog } from '@/core/utils/logger'
 import { storageManager } from '@/core/services/storage/StorageManager'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { AuthService, type UserHydrationData } from '@/core/services/api/services/AuthService'
+import { HydrationService } from '@/core/services/hydration/HydrationService'
 import { database } from '@/core/database/schema'
 import { authStorageFix } from './auth.store.fix'
 
@@ -184,34 +185,37 @@ export const useAuthStore = create<AuthStore>()(
             roles: [userRole]
           })
 
-          // 🎯 HYDRATATION PROFESSIONNELLE - Charger toutes les données utilisateur depuis les données de login
+          // 🎯 HYDRATATION IMMÉDIATE - utiliser le payload du login
           try {
-            const loginData = AuthService.getLastLoginData()
-            if (loginData) {
+            const rawLoginData = AuthService.getLastLoginData()
+            if (rawLoginData) {
               stateLog.debug('🌊 Starting immediate hydration with login data...')
-              const hydrationData = AuthService.extractHydrationData(loginData)
-              await get().hydrateUserDataWithData(hydrationData)
+              const hydrationData = HydrationService.parse(rawLoginData)
+              await HydrationService.syncToDexie(hydrationData)
 
-              // Marquer l'hydratation comme réussie dans l'état
               set((state) => {
                 state.isHydrated = true
                 state.lastHydration = new Date()
+                state.hydrationError = null
+                state.hydratedData = hydrationData
               })
 
               stateLog.info('✅ User data hydrated and cached locally', {
                 machines: hydrationData.machines.length,
                 sites: hydrationData.sites.length,
-                installations: hydrationData.installations.length
+                installations: hydrationData.installations.length,
+                campaigns: hydrationData.campaigns.length,
+                calculations: hydrationData.calculations.length
               })
             } else {
               stateLog.warn('⚠️ No login data available for hydration')
             }
           } catch (hydrationError) {
             stateLog.warn('⚠️ Hydration failed, but login successful', { hydrationError })
-            // Marquer l'hydratation comme échouée mais continuer
             set((state) => {
               state.isHydrated = false
               state.hydrationError = hydrationError instanceof Error ? hydrationError.message : 'Unknown hydration error'
+              state.hydratedData = null
             })
           }
 
@@ -594,61 +598,10 @@ export const useAuthStore = create<AuthStore>()(
 
           stateLog.debug('🌊 Starting data hydration...')
 
-          // Appeler l'API d'hydratation
-          const hydrationData: UserHydrationData = await AuthService.hydrate()
-
-          stateLog.debug('📦 Hydration data received', {
-            machines: hydrationData.machines?.length || 0,
-            sites: hydrationData.sites?.length || 0,
-            installations: hydrationData.installations?.length || 0
-          })
-
-          // Stocker en IndexedDB de manière sécurisée
-          await database.transaction('rw', [database.machines, database.sites, database.installations], async () => {
-            // Stocker les machines
-            if (hydrationData.machines && Array.isArray(hydrationData.machines)) {
-              for (const m of hydrationData.machines) {
-                await database.machines.put({
-                  id: m.id,
-                  name: m.name || 'Machine',
-                  macAddress: m.macAddress || (m as any).macD,
-                  model: m.model || 'trackbee',
-                  description: m.description || '',
-                  type: m.type || 'trackbee',
-                  isActive: m.isActive !== false,
-                  lastConnectionState: { status: m.isActive ? 'connected' : 'disconnected' },
-                  lastSeenAt: new Date(),
-                  createdAt: (m as any).createdAt || new Date().toISOString(),
-                  updatedAt: (m as any).updatedAt || new Date().toISOString(),
-                  syncedAt: new Date()
-                })
-              }
-            }
-
-            // Stocker les sites
-            if (hydrationData.sites && Array.isArray(hydrationData.sites)) {
-              for (const site of hydrationData.sites) {
-                await database.sites.put({
-                  ...site,
-                  syncedAt: new Date()
-                })
-              }
-            }
-
-            // Stocker toutes les installations
-            if (hydrationData.installations && Array.isArray(hydrationData.installations)) {
-              for (const installation of hydrationData.installations) {
-                await database.installations.put({
-                  ...installation,
-                  syncedAt: new Date(),
-                  isActive: installation.isActive || true
-                })
-              }
-            }
-          })
-
-          // Sauvegarder la date de dernière synchronisation
+          const hydrationData = await HydrationService.fetch()
+          await HydrationService.syncToDexie(hydrationData as UserHydrationData)
           await database.saveAppState('lastDataSync', new Date())
+
           // Mémoriser en store (mémoire) l'hydratation
           set((state) => {
             state.isHydrated = true
@@ -659,14 +612,21 @@ export const useAuthStore = create<AuthStore>()(
 
           timer.end({ success: true })
           stateLog.info('✅ User data hydration completed', {
-            machines: hydrationData.machines?.length || 0,
-            sites: hydrationData.sites?.length || 0,
-            installations: hydrationData.installations?.length || 0
+            machines: hydrationData.machines.length,
+            sites: hydrationData.sites.length,
+            installations: hydrationData.installations.length,
+            campaigns: hydrationData.campaigns.length,
+            calculations: hydrationData.calculations.length
           })
 
         } catch (error) {
           timer.end({ error })
           stateLog.error('❌ User data hydration failed', { error })
+          set((state) => {
+            state.isHydrated = false
+            state.hydrationError = error instanceof Error ? error.message : 'Hydration failed'
+            state.hydratedData = null
+          })
           throw error
         }
       },
@@ -681,70 +641,9 @@ export const useAuthStore = create<AuthStore>()(
             installations: hydrationData.installations?.length || 0
           })
 
-          // Stocker en IndexedDB de manière sécurisée
-          await database.transaction('rw', [database.machines, database.sites, database.installations], async () => {
-            // Stocker les machines
-            if (hydrationData.machines && Array.isArray(hydrationData.machines)) {
-              for (const machine of hydrationData.machines) {
-                await database.machines.put({
-                  id: machine.id,
-                  name: machine.name || 'Machine sans nom',
-                  macAddress: machine.macD || machine.macAddress,
-                  model: machine.model || 'trackbee',
-                  description: machine.description || '',
-                  type: machine.type || 'trackbee',
-                  isActive: machine.status !== false,
-                  lastConnectionState: machine.status ? 'connected' : 'disconnected',
-                  lastSeenAt: new Date(),
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                  syncedAt: new Date()
-                })
-              }
-            }
-
-            // Stocker les sites
-            if (hydrationData.sites && Array.isArray(hydrationData.sites)) {
-              for (const s of hydrationData.sites) {
-                await database.sites.put({
-                  id: s.id,
-                  name: s.name,
-                  description: s.description || '',
-                  address: (s as any).address || '',
-                  lat: s.lat ?? undefined,
-                  lng: (s as any).lng ?? undefined,
-                  altitude: (s as any).altitude ?? undefined,
-                  ownership: (s as any).ownership === 'owned' ? 'owner' : 'shared',
-                  sharedRole: (s as any).ownership?.startsWith?.('shared_') ? ((s as any).ownership.split('_')[1]) : (s as any).sharedRole,
-                  isPublic: false,
-                  createdAt: (s as any).createdAt || new Date().toISOString(),
-                  updatedAt: (s as any).updatedAt || new Date().toISOString(),
-                  syncedAt: new Date()
-                } as any)
-              }
-            }
-
-            // Stocker toutes les installations
-            if (hydrationData.installations && Array.isArray(hydrationData.installations)) {
-              for (const inst of hydrationData.installations) {
-                const createdAt = (inst as any).installedAt || (inst as any).createdAt || new Date().toISOString()
-                const updatedAt = (inst as any).updatedAt || createdAt
-                await database.installations.put({
-                  id: inst.id,
-                  machineId: inst.machineId,
-                  siteId: inst.siteId,
-                  positionIndex: inst.positionIndex || 1,
-                  isActive: (inst as any).uninstalledAt ? false : true,
-                  createdAt: typeof createdAt === 'string' ? createdAt : new Date(createdAt).toISOString(),
-                  updatedAt: typeof updatedAt === 'string' ? updatedAt : new Date(updatedAt).toISOString(),
-                  syncedAt: new Date()
-                } as any)
-              }
-            }
-          })
-
-          // Sauvegarder la date de dernière synchronisation
+          await HydrationService.syncToDexie(hydrationData)
           await database.saveAppState('lastDataSync', new Date())
+
           // Mémoriser en store (mémoire) l'hydratation
           set((state) => {
             state.isHydrated = true
@@ -763,6 +662,11 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error) {
           timer.end({ error })
           stateLog.error('❌ User data hydration with data failed', { error })
+          set((state) => {
+            state.isHydrated = false
+            state.hydrationError = error instanceof Error ? error.message : 'Hydration failed'
+            state.hydratedData = null
+          })
           throw error
         }
       },
