@@ -1,134 +1,186 @@
-# CLAUDE.md
+# CLAUDE.md - TrackBee Project Documentation Management
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 📍 Project Locations
 
-## Project Overview
-
-TrackBee App2 is a React + TypeScript mobile application for IoT GPS device management. It's built with Vite, uses Capacitor for native mobile features, and implements an event-driven architecture for handling BLE/WiFi device communication and file transfers.
-
-## Commands
-
-### Development
-- `npm run dev` - Start development server (host 0.0.0.0:5180)
-- `npm run build` - Production build (TypeScript check + Vite build)
-- `npm run type-check` - TypeScript type checking only
-- `npm run lint` - ESLint with TypeScript rules
-
-### Testing
-- `npm test` - Run Vitest unit tests
-- `npm run test:ui` - Vitest UI mode
-- `npm run test:coverage` - Generate coverage report
-
-### Mobile (Capacitor)
-- `npm run cap:sync` - Sync web assets to native platforms
-- `npm run cap:open:android` - Open Android Studio
-- `npm run cap:run:android` - Build and run on Android
-
-## Architecture Overview
-
-### Core Structure
-The project follows a **feature-based architecture** with strict separation of concerns:
-
-```
-src/
-├── core/           # Core infrastructure layer
-│   ├── database/   # Dexie IndexedDB repositories
-│   ├── orchestrator/ # Event Bus & Transfer Orchestrator
-│   ├── services/   # BLE, HTTP, Storage managers
-│   ├── state/      # TanStack Query + Zustand stores
-│   ├── types/      # TypeScript definitions
-│   └── utils/      # Logger, time, validation utilities
-├── features/       # Business domain features
-│   ├── auth/       # Authentication & user session
-│   ├── device/     # IoT device management (BLE)
-│   ├── site/       # Geographic sites & mapping
-│   ├── campaign/   # GNSS campaigns (STATIC/MULTIPLE)
-│   ├── transfer/   # File transfers (BLE→WiFi→Upload)
-│   └── processing/ # Post-processing results
-└── shared/         # Shared UI components & utilities
-    └── ui/         # Design system components
-```
-
-### Key Technologies
-- **React 18.3** + **TypeScript 5.6** (strict mode enabled)
-- **TanStack Query v5** for server state management
-- **Zustand** for client state management
-- **Dexie v4** for offline IndexedDB database
-- **Capacitor 7.4** for native mobile features
-- **Tailwind CSS** with custom TrackBee design system
-
-### Event-Driven Architecture
-The app uses a central **EventBus** (`src/core/orchestrator/EventBus.ts`) for decoupled communication between services and UI components. Key event types defined in `src/core/types/transport.ts`.
-
-### State Management Pattern
-- **Server State**: TanStack Query for API calls, caching, background refetch
-- **Client State**: Zustand stores per domain (auth, device, transfer, ui)
-- **Local State**: React useState/useReducer for component-specific UI state
-
-### BLE Communication
-ESP32-C6 devices use **protocol A100** for GNSS file transfers. The `BleManager` (`src/core/services/ble/BleManager.ts`) handles:
-- Device scanning and connection management
-- File metadata discovery and transfer initiation
-- Chunked data transfer with progress tracking
-- Error handling and automatic reconnection
-
-### TypeScript Configuration
-- **Strict mode enabled** with `noUncheckedIndexedAccess`
-- **Path mapping**: `@/*` resolves to `src/*` with feature-specific aliases
-- **Bundler module resolution** for Vite compatibility
-
-## Development Guidelines
-
-### Adding New Features
-1. Create feature directory in `src/features/[feature-name]/`
-2. Follow the standard structure: `components/`, `hooks/`, `pages/`, `types/`
-3. Export from feature's `index.ts` for clean imports
-4. Use EventBus for cross-feature communication
-
-### Type Safety
-- All types are defined in `src/core/types/` with Zod validation schemas
-- Use strict TypeScript - prefer explicit types over `any`
-- Validate external data (API responses, BLE messages) with Zod
-
-### State Management
-- Use TanStack Query for server data (queries, mutations, caching)
-- Use Zustand for app-wide client state
-- Keep UI state local when possible
-
-### Error Handling
-- Use `src/core/types/errors.ts` AppError types for structured errors
-- All async operations should use proper error boundaries
-- Log errors through the structured logger (`src/core/utils/logger.ts`)
-
-### Mobile Considerations
-- Design mobile-first with responsive breakpoints
-- Use Capacitor plugins for native features (BLE, filesystem, preferences)
-- Handle offline scenarios with service workers and local database
-
-## Important Notes
-
-- The codebase is currently in **stabilization phase** with ~698 TypeScript errors being addressed
-- Core infrastructure (60 errors) has been largely stabilized
-- Focus on features layer (~400 errors) for business logic implementation
-- Never commit without running `npm run type-check` and `npm run lint`
-- Test on physical devices for BLE functionality - web simulator has limitations
-
-## Project Ecosystem Locations
-
-### Related Repositories
+### TrackBee Ecosystem Components
 - **TrackBee App (Current)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\2.Front\trackbee_app2`
-- **TrackBee IoT (ESP32-C6)**: `C:\Users\fanjo\workspace\trackbee_v6` or latest version `trackbee_v{number}`
-- **TrackBee Backend (Node.js)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_back`
-- **TrackBee Python (RTKLIB)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_python`
+- **TrackBee IoT (ESP32-C6)**: `C:\Users\fanjo\workspace\trackbee_v6`
+- **TrackBee Backend (Node.js)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_back2\src\route`
 
-### System Overview
-TrackBee is a complete IoT GNSS positioning ecosystem:
-- **ESP32-C6 + simpleRTK2B** devices for autonomous GNSS data collection
-- **React/Capacitor mobile app** for device management and data transfer (BLE/WiFi)
-- **Node.js backend** for user management, data processing, and orchestration
-- **Python/RTKLIB** container for precise GNSS post-processing calculations
+---
 
-### Key Business Scenarios
-1. **STATIC_UNIQUE**: Single immediate/scheduled GNSS recording session
-2. **STATIC_MULTIPLE**: Multiple scheduled recordings over time period
-3. **STATIC_ROVERBASE_MULTIPLE**: Network of devices with base/rover setup (future)
+## 📚 Documentation Files Structure
+
+This project maintains **4 core documentation files** that must be kept synchronized with code changes:
+
+### 1. `trackbee_iot.md` - ESP32-C6 IoT Documentation
+**Covers**: ESP32-C6 firmware, BLE protocols, GNSS RTK, hardware configuration
+**Update when**:
+- Firmware version changes
+- BLE service modifications (A001/A100)
+- New JSON commands added
+- GPIO mapping changes
+- GNSS configuration updates
+- Hardware specifications changes
+
+### 2. `trackbee_app.md` - React Mobile App Documentation
+**Covers**: React architecture, state management, BLE integration, mobile features
+**Update when**:
+- New features added to React app
+- State management changes (Zustand stores)
+- BLE communication protocol updates
+- UI components modifications
+- Capacitor plugin changes
+- Performance optimizations
+
+### 3. `trackbee_back.md` - Node.js Backend Documentation
+**Covers**: API endpoints, database models, authentication, Python integration
+**Update when**:
+- New API endpoints added/modified
+- Database schema changes
+- Authentication logic updates
+- File upload modifications
+- Python RTKLIB integration changes
+- Security enhancements
+
+### 4. `scenario.md` - End-to-End User Scenarios
+**Covers**: Complete user workflows, validation scenarios, performance metrics
+**Update when**:
+- New user workflows implemented
+- Integration changes between components
+- Performance metrics updates
+- New test scenarios added
+- Validation procedures modified
+
+---
+
+## 🔄 Documentation Update Protocol
+
+### IMPORTANT: Keep Documentation Synchronized
+
+**Each time you modify code in any component (IoT, App, Backend), you MUST update the corresponding documentation file.**
+
+### Update Triggers
+
+#### For `trackbee_iot.md` updates:
+```bash
+# When modifying ESP32-C6 code:
+cd C:\Users\fanjo\workspace\trackbee_v6
+# After code changes, update trackbee_iot.md sections:
+# - Architecture, BLE protocols, GPIO mapping, firmware version
+```
+
+#### For `trackbee_app.md` updates:
+```bash
+# When modifying React app code:
+cd C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\2.Front\trackbee_app2
+# After code changes, update trackbee_app.md sections:
+# - Features, state management, UI components, performance
+```
+
+#### For `trackbee_back.md` updates:
+```bash
+# When modifying Node.js backend code:
+cd C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_back2\src\route
+# After code changes, update trackbee_back.md sections:
+# - API endpoints, models, controllers, processing integration
+```
+
+#### For `scenario.md` updates:
+```bash
+# When integration between components changes:
+# Update user scenarios, workflows, validation procedures
+```
+
+---
+
+## 🎯 Maintenance Guidelines
+
+### Before Code Changes
+1. **Read relevant documentation** to understand current architecture
+2. **Plan changes** considering impact on other components
+3. **Update documentation** immediately after code modifications
+
+### Documentation Quality Standards
+- **Keep sections up to date** with actual code implementation
+- **Update version numbers** and status indicators
+- **Maintain code examples** that reflect actual usage
+- **Update performance metrics** when optimizations are made
+- **Sync API endpoints** with actual backend routes
+
+### Version Control
+- **Commit documentation updates** together with code changes
+- **Use meaningful commit messages** that reference doc updates
+- **Review documentation** during pull request reviews
+
+---
+
+## 🛠️ Development Commands
+
+### TrackBee App Development
+```bash
+cd C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\2.Front\trackbee_app2
+
+# Development
+npm run dev                    # Start development server
+npm run build                  # Production build
+npm run type-check             # TypeScript validation
+npm run lint                   # Code linting
+
+# Mobile
+npm run cap:sync              # Sync to native platforms
+npm run cap:run:android       # Run on Android device
+```
+
+### TrackBee Backend Development
+```bash
+cd C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_back2
+
+# Development
+npm start                     # Start backend server
+npm run dev                   # Development with auto-reload
+npm test                      # Run tests
+npm run migrate              # Database migrations
+```
+
+### TrackBee IoT Development
+```bash
+cd C:\Users\fanjo\workspace\trackbee_v6
+
+# ESP-IDF Development
+idf.py build                  # Build firmware
+idf.py flash -p COM3          # Flash to ESP32-C6
+idf.py monitor                # Monitor logs
+idf.py menuconfig            # Configuration
+```
+
+---
+
+## 📊 Documentation Metrics
+
+### Current Status (Last Updated: 2025-09-29)
+- **trackbee_iot.md**: 10.9 KB - ESP32-C6 Firmware v6 documented ✅
+- **trackbee_app.md**: 22.0 KB - React App production ready ✅
+- **trackbee_back.md**: 31.9 KB - Node.js API operational ✅
+- **scenario.md**: 14.7 KB - End-to-end validation complete ✅
+
+### Update Frequency Target
+- **Critical changes**: Update immediately
+- **Minor changes**: Update within 24h
+- **Documentation review**: Weekly verification
+- **Complete audit**: Monthly full review
+
+---
+
+## 🎯 Remember
+
+**Documentation is code** - Keep it current, accurate, and useful.
+
+When in doubt about any component, **check the corresponding .md file first** - it should contain the most up-to-date information about architecture, APIs, and usage patterns.
+
+**Good documentation saves hours of debugging and onboarding time.**
+
+---
+
+*This file serves as the master guide for maintaining TrackBee ecosystem documentation.*
+*Always update this file if project locations or documentation structure changes.*

@@ -9,6 +9,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { storageManager } from '@/core/services/storage/StorageManager'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
+import { AuthService } from '@/core/services/api/services'
 import type {
   User,
   AuthSession,
@@ -131,64 +132,40 @@ export const useAuthStore = create<AuthStore>()(
 const authAPI = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     authLog.info('Login attempt', { email: credentials.email })
-    const apiResponse = await httpClient.post<LoginResponse>('/auth/login', credentials)
-    if (!apiResponse.data) {
-      throw new Error('No data in login response')
-    }
-    const response = apiResponse.data
+    const response = await AuthService.login(credentials)
     authLog.info('Login successful', { userId: response.user.id })
     return response
   },
 
   async register(data: RegisterData): Promise<RegisterResponse> {
     authLog.info('Register attempt', { email: data.email })
-    const apiResponse = await httpClient.post<RegisterResponse>('/auth/register', data)
-    if (!apiResponse.data) {
-      throw new Error('No data in register response')
-    }
-    const response = apiResponse.data
+    const response = await AuthService.register(data)
     authLog.info('Register successful', { userId: response.user.id })
     return response
   },
 
   async logout(): Promise<void> {
     authLog.info('Logout request')
-    try {
-      await httpClient.post('/auth/logout')
-    } catch (error) {
-      authLog.warn('Logout API call failed', error)
-      // Continue with local logout even if API fails
-    }
+    await AuthService.logout()
   },
 
   async refreshToken(refreshToken: string): Promise<{ token: string; expiresAt: string }> {
     authLog.debug('Refreshing token')
-    const apiResponse = await httpClient.post<{ token: string; expiresAt: string }>(
-      '/auth/refresh',
-      { refreshToken }
-    )
-    if (!apiResponse.data) {
-      throw new Error('No data in refresh token response')
-    }
-    const response = apiResponse.data
+    const response = await AuthService.refreshToken(refreshToken)
     authLog.debug('Token refreshed successfully')
     return response
   },
 
   async updateProfile(data: Partial<User>): Promise<User> {
     authLog.info('Update profile', { fields: Object.keys(data) })
-    const apiResponse = await httpClient.put<User>('/auth/profile', data)
-    if (!apiResponse.data) {
-      throw new Error('No data in update profile response')
-    }
-    const response = apiResponse.data
+    const response = await AuthService.updateProfile(data)
     authLog.info('Profile updated successfully')
     return response
   },
 
   async changePassword(oldPassword: string, newPassword: string): Promise<void> {
     authLog.info('Change password request')
-    await httpClient.put('/auth/change-password', { oldPassword, newPassword })
+    await AuthService.changePassword(oldPassword, newPassword)
     authLog.info('Password changed successfully')
   }
 }

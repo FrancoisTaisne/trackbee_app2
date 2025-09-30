@@ -39,85 +39,113 @@ const siteListLog = {
 // ==================== API FUNCTIONS ====================
 
 /**
- * Récupère tous les sites avec leurs relations
+ * Récupère tous les sites avec leurs relations depuis IndexedDB
  */
 const fetchSiteBundles = async (filters?: SiteFilters): Promise<SiteBundle[]> => {
-  siteListLog.debug('Fetching site bundles', { filters })
+  siteListLog.debug('🔄 Fetching site bundles from IndexedDB...', { filters })
 
-  // Construire les paramètres de requête
-  const params = new URLSearchParams()
-  if (filters?.search) params.append('search', filters.search)
-  if (filters?.ownership) params.append('ownership', filters.ownership)
-  if (filters?.hasInstallations !== undefined) params.append('hasInstallations', String(filters.hasInstallations))
-  if (filters?.isPublic !== undefined) params.append('isPublic', String(filters.isPublic))
-  if (filters?.coordinateSystem) params.append('coordinateSystem', filters.coordinateSystem)
+  try {
+    // Import du service centralisé pour accès aux données locales
+    const { DataService } = await import('@/core/services/data/DataService')
 
-  // Récupérer les données de base en parallèle
-  const [sites, installations, machines] = await Promise.all([
-    httpClient.get<Site[]>(`/api/sites?${params}`),
-    httpClient.get<Installation[]>('/api/installations'),
-    httpClient.get<Machine[]>('/api/machines')
-  ])
+    // Récupérer les bundles depuis la base de données locale
+    const bundles = await DataService.buildSiteBundles()
 
-  // Créer des maps pour optimiser les lookups
-  const installationsBySite = new Map<number, Installation[]>()
-  const machinesByInstallation = new Map<number, Machine>()
+    // Transformer le format pour correspondre aux types attendus
+    const siteBundles: SiteBundle[] = bundles.map(bundle => ({
+      site: {
+        id: bundle.id,
+        name: bundle.name,
+        description: bundle.description || '',
+        coordinates: bundle.coordinates,
+        address: bundle.address || '',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lat: bundle.coordinates?.latitude,
+        lng: bundle.coordinates?.longitude
+      },
+      installations: bundle.installations || [],
+      machines: bundle.machines || [],
+      campaigns: [], // TODO: Récupérer campaigns depuis IndexedDB
+      calculations: [], // TODO: Récupérer calculations depuis IndexedDB
+      statistics: bundle.statistics || {
+        totalInstallations: 0,
+        activeInstallations: 0,
+        totalMachines: 0,
+        connectedMachines: 0,
+        totalCampaigns: 0,
+        activeCampaigns: 0,
+        completedCalculations: 0,
+        failedCalculations: 0,
+        lastActivity: undefined
+      }
+    }))
 
-  installations.forEach(installation => {
-    if (!installationsBySite.has(installation.siteId)) {
-      installationsBySite.set(installation.siteId, [])
+    // Appliquer les filtres côté client si nécessaire
+    let filteredBundles = siteBundles
+    if (filters?.search) {
+      const searchLower = filters.search.toLowerCase()
+      filteredBundles = filteredBundles.filter(bundle =>
+        bundle.site.name.toLowerCase().includes(searchLower) ||
+        bundle.site.description?.toLowerCase().includes(searchLower) ||
+        bundle.site.address?.toLowerCase().includes(searchLower)
+      )
     }
-    installationsBySite.get(installation.siteId)!.push(installation)
-  })
 
-  machines.forEach(machine => {
-    machinesByInstallation.set(machine.id, machine)
-  })
+    siteListLog.info('✅ Site bundles fetched from IndexedDB', { count: filteredBundles.length })
+    return filteredBundles
 
-  // Construire les bundles
-  const bundles: SiteBundle[] = await Promise.all(
-    sites.map(async (site) => {
-      const siteInstallations = installationsBySite.get(site.id) || []
-      const siteMachines = siteInstallations
-        .map(i => machinesByInstallation.get(i.machineId))
-        .filter(Boolean) as Machine[]
+  } catch (error) {
+    siteListLog.error('❌ Failed to fetch site bundles from IndexedDB', { error })
 
-      // Récupérer les campaigns et calculations pour ce site
-      const [campaigns, calculations] = await Promise.all([
-        httpClient.get(`/api/sites/${site.id}/campaigns`).catch(() => []),
-        httpClient.get(`/api/sites/${site.id}/calculations`).catch(() => [])
+    // Fallback: essayer de récupérer depuis l'API si la DB locale échoue
+    siteListLog.warn('🔄 Falling back to API for site bundles...')
+
+    try {
+      // Construire les paramètres de requête
+      const params = new URLSearchParams()
+      if (filters?.search) params.append('search', filters.search)
+      if (filters?.ownership) params.append('ownership', filters.ownership)
+      if (filters?.hasInstallations !== undefined) params.append('hasInstallations', String(filters.hasInstallations))
+      if (filters?.isPublic !== undefined) params.append('isPublic', String(filters.isPublic))
+      if (filters?.coordinateSystem) params.append('coordinateSystem', filters.coordinateSystem)
+
+      // Récupérer les données de base en parallèle
+      const [sites, installations, machines] = await Promise.all([
+        httpClient.get<Site[]>(`/api/sites?${params}`),
+        httpClient.get<Installation[]>('/api/installations').catch(() => []),
+        httpClient.get<Machine[]>('/api/machines').catch(() => [])
       ])
 
-      // Calculer les statistiques
-      const statistics: SiteStatistics = {
-        totalInstallations: siteInstallations.length,
-        activeInstallations: siteInstallations.filter(i =>
-          siteMachines.find(m => m.id === i.machineId)?.isActive
-        ).length,
-        totalMachines: siteMachines.length,
-        connectedMachines: 0, // TODO: Récupérer depuis BLE store
-        totalCampaigns: campaigns.length,
-        activeCampaigns: campaigns.filter((c: any) => c.status === 'active').length,
-        completedCalculations: calculations.filter((c: any) => c.status === 'done').length,
-        failedCalculations: calculations.filter((c: any) => c.status === 'failed').length,
-        lastActivity: siteInstallations.length > 0
-          ? new Date(Math.max(...siteInstallations.map(i => new Date(i.updatedAt).getTime())))
-          : undefined
-      }
-
-      return {
+      // Construire des bundles basiques depuis l'API
+      const apiBundles: SiteBundle[] = sites.map(site => ({
         site,
-        installations: siteInstallations,
-        machines: siteMachines,
-        campaigns,
-        calculations,
-        statistics
-      }
-    })
-  )
+        installations: [],
+        machines: [],
+        campaigns: [],
+        calculations: [],
+        statistics: {
+          totalInstallations: 0,
+          activeInstallations: 0,
+          totalMachines: 0,
+          connectedMachines: 0,
+          totalCampaigns: 0,
+          activeCampaigns: 0,
+          completedCalculations: 0,
+          failedCalculations: 0,
+          lastActivity: undefined
+        }
+      }))
 
-  siteListLog.debug('Site bundles fetched', { count: bundles.length })
-  return bundles
+      siteListLog.warn('⚠️ Site bundles fetched from API fallback', { count: apiBundles.length })
+      return apiBundles
+
+    } catch (apiError) {
+      siteListLog.error('❌ Both IndexedDB and API failed for site bundles', { apiError })
+      return []
+    }
+  }
 }
 
 /**
@@ -353,9 +381,37 @@ export const useSiteList = (
 
   const createSiteMutation = useMutation({
     mutationFn: createSite,
-    onSuccess: (newSite) => {
+    onSuccess: async (newSite) => {
       // Invalider les caches
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.lists() })
+
+      // 🎯 HYDRATATION AUTOMATIQUE - Ajouter le nouveau site à IndexedDB
+      try {
+        const { database } = await import('@/core/database/schema')
+        await database.sites.put({
+          id: newSite.id,
+          name: newSite.name,
+          description: newSite.description || '',
+          address: newSite.address || '',
+          lat: newSite.lat || undefined,
+          lng: newSite.lng || newSite.lon || undefined,
+          altitude: newSite.altitude || undefined,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          syncedAt: new Date()
+        })
+
+        siteListLog.info('✅ New site automatically hydrated to IndexedDB', {
+          siteId: newSite.id,
+          siteName: newSite.name
+        })
+      } catch (hydrationError) {
+        siteListLog.warn('⚠️ Failed to hydrate new site to IndexedDB', {
+          error: hydrationError,
+          site: newSite
+        })
+      }
 
       // Événement global
       eventBus.emit('site:created', { site: newSite })
@@ -371,11 +427,36 @@ export const useSiteList = (
   const updateSiteMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: UpdateSiteData }) =>
       updateSite(id, data),
-    onSuccess: (updatedSite) => {
+    onSuccess: async (updatedSite) => {
       // Invalider les caches spécifiques
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.lists() })
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.detail(updatedSite.id) })
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.bundle(updatedSite.id) })
+
+      // 🎯 HYDRATATION AUTOMATIQUE - Mettre à jour le site dans IndexedDB
+      try {
+        const { database } = await import('@/core/database/schema')
+        await database.sites.update(updatedSite.id, {
+          name: updatedSite.name,
+          description: updatedSite.description || '',
+          address: updatedSite.address || '',
+          lat: updatedSite.lat || undefined,
+          lng: updatedSite.lng || updatedSite.lon || undefined,
+          altitude: updatedSite.altitude || undefined,
+          updatedAt: new Date(),
+          syncedAt: new Date()
+        })
+
+        siteListLog.info('✅ Updated site automatically synced to IndexedDB', {
+          siteId: updatedSite.id,
+          siteName: updatedSite.name
+        })
+      } catch (hydrationError) {
+        siteListLog.warn('⚠️ Failed to sync updated site to IndexedDB', {
+          error: hydrationError,
+          site: updatedSite
+        })
+      }
 
       // Événement global
       eventBus.emit('site:updated', { siteId: updatedSite.id, site: updatedSite })
@@ -390,11 +471,26 @@ export const useSiteList = (
 
   const deleteSiteMutation = useMutation({
     mutationFn: deleteSite,
-    onSuccess: (_, deletedId) => {
+    onSuccess: async (_, deletedId) => {
       // Invalider les caches
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.lists() })
       queryClient.removeQueries({ queryKey: siteQueryKeys.detail(deletedId) })
       queryClient.removeQueries({ queryKey: siteQueryKeys.bundle(deletedId) })
+
+      // 🎯 HYDRATATION AUTOMATIQUE - Supprimer le site d'IndexedDB
+      try {
+        const { database } = await import('@/core/database/schema')
+        await database.sites.delete(deletedId)
+
+        siteListLog.info('✅ Deleted site automatically removed from IndexedDB', {
+          siteId: deletedId
+        })
+      } catch (hydrationError) {
+        siteListLog.warn('⚠️ Failed to remove deleted site from IndexedDB', {
+          error: hydrationError,
+          siteId: deletedId
+        })
+      }
 
       // Événement global
       eventBus.emit('site:deleted', { siteId: deletedId })

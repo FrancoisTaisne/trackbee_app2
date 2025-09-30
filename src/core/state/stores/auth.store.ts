@@ -6,12 +6,22 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import type { User, UserSession } from '@/core/types/domain'
+import type { User } from '@/features/auth/types'
 import { stateLog } from '@/core/utils/logger'
 import { storageManager } from '@/core/services/storage/StorageManager'
 import { httpClient } from '@/core/services/api/HttpClient'
+import { AuthService, type UserHydrationData } from '@/core/services/api/services/AuthService'
+import { database } from '@/core/database/schema'
+import { authStorageFix } from './auth.store.fix'
 
 // ==================== TYPES ====================
+
+interface UserSession {
+  refreshToken: string
+  expiresAt: Date
+  permissions: string[]
+  roles: string[]
+}
 
 interface AuthState {
   // État de session
@@ -32,11 +42,17 @@ interface AuthState {
   // Permissions et rôles
   permissions: string[]
   roles: string[]
+
+  // Hydratation tracking
+  isHydrated: boolean
+  lastHydration: Date | null
+  hydrationError: string | null
 }
 
 interface AuthActions {
   // Actions de session
-  login: (credentials: { email: string; password: string }) => Promise<boolean>
+  login: (credentials: { email: string; password: string }) => Promise<UserSession>
+  register: (data: any) => Promise<UserSession>
   logout: () => Promise<void>
   refreshToken: () => Promise<boolean>
 
@@ -52,6 +68,11 @@ interface AuthActions {
   // Initialisation
   initialize: () => Promise<void>
   cleanup: () => void
+
+  // Hydratation des données
+  hydrateUserData: () => Promise<void>
+  hydrateUserDataWithData: (data: UserHydrationData) => Promise<void>
+  refreshUserData: () => Promise<void>
 
   // Validation session
   validateSession: () => boolean
@@ -76,7 +97,11 @@ const initialState: AuthState = {
   lastActivity: null,
 
   permissions: [],
-  roles: []
+  roles: [],
+
+  isHydrated: false,
+  lastHydration: null,
+  hydrationError: null
 }
 
 // ==================== STORAGE KEYS ====================
@@ -108,20 +133,22 @@ export const useAuthStore = create<AuthStore>()(
         try {
           stateLog.debug('🔐 Login attempt', { email: credentials.email })
 
-          // Appel API de connexion
-          const response = await httpClient.post<{
-            user: User
-            session: UserSession
-            token: string
-            permissions: string[]
-            roles: string[]
-          }>('/api/auth/login', credentials)
+          // Use the corrected AuthService which handles the data transformation
+          const loginResponse = await AuthService.login(credentials)
 
-          if (!response.success || !response.data) {
-            throw new Error('Invalid login response')
+          const { user, token, expiresAt, refreshToken } = loginResponse
+
+          // Map user role to permissions (basic implementation)
+          const userRole = user.role || 'user'
+          const permissions = (userRole === 'admin') ? ['read', 'write', 'delete'] : ['read']
+
+          // Create session object from login response
+          const session: UserSession = {
+            refreshToken: refreshToken || '',
+            expiresAt: new Date(expiresAt),
+            permissions,
+            roles: [userRole] // Convert single role to array for compatibility
           }
-
-          const { user, session, token, permissions, roles } = response.data
 
           // Stocker les données de session
           await Promise.all([
@@ -142,7 +169,7 @@ export const useAuthStore = create<AuthStore>()(
             state.session = session
             state.token = token
             state.permissions = permissions
-            state.roles = roles
+            state.roles = [userRole]
             state.lastActivity = new Date()
             state.showLoginModal = false
             state.loginError = null
@@ -152,10 +179,41 @@ export const useAuthStore = create<AuthStore>()(
           stateLog.info('✅ Login successful', {
             userId: user.id,
             email: user.email,
-            roles: roles.length
+            roles: [userRole]
           })
 
-          return true
+          // 🎯 HYDRATATION PROFESSIONNELLE - Charger toutes les données utilisateur depuis les données de login
+          try {
+            const loginData = AuthService.getLastLoginData()
+            if (loginData) {
+              stateLog.debug('🌊 Starting immediate hydration with login data...')
+              const hydrationData = AuthService.extractHydrationData(loginData)
+              await get().hydrateUserDataWithData(hydrationData)
+
+              // Marquer l'hydratation comme réussie dans l'état
+              set((state) => {
+                state.isHydrated = true
+                state.lastHydration = new Date()
+              })
+
+              stateLog.info('✅ User data hydrated and cached locally', {
+                machines: hydrationData.machines.length,
+                sites: hydrationData.sites.length,
+                installations: hydrationData.installations.length
+              })
+            } else {
+              stateLog.warn('⚠️ No login data available for hydration')
+            }
+          } catch (hydrationError) {
+            stateLog.warn('⚠️ Hydration failed, but login successful', { hydrationError })
+            // Marquer l'hydratation comme échouée mais continuer
+            set((state) => {
+              state.isHydrated = false
+              state.hydrationError = hydrationError instanceof Error ? hydrationError.message : 'Unknown hydration error'
+            })
+          }
+
+          return session
 
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Login failed'
@@ -169,7 +227,85 @@ export const useAuthStore = create<AuthStore>()(
           timer.end({ error: errorMsg })
           stateLog.error('❌ Login failed', { error: errorMsg })
 
-          return false
+          throw new Error(errorMsg)
+        }
+      },
+
+      register: async (data) => {
+        const timer = stateLog.time('Register attempt')
+
+        set((state) => {
+          state.isLoading = true
+          state.loginError = null
+        })
+
+        try {
+          stateLog.debug('📝 Register attempt', { email: data.email })
+
+          // Use AuthService for registration
+          const registerResponse = await AuthService.register(data)
+
+          const { user, token, expiresAt, refreshToken } = registerResponse
+
+          // Map user role to permissions
+          const userRole = user.role || 'user'
+          const permissions = (userRole === 'admin') ? ['read', 'write', 'delete'] : ['read']
+
+          // Create session object from register response
+          const session: UserSession = {
+            refreshToken: refreshToken || '',
+            expiresAt: new Date(expiresAt),
+            permissions,
+            roles: [userRole]
+          }
+
+          // Store session data
+          await Promise.all([
+            storageManager.set(STORAGE_KEYS.SESSION, session, { type: 'secure' }),
+            storageManager.set(STORAGE_KEYS.TOKEN, token, { type: 'secure' }),
+            storageManager.set(STORAGE_KEYS.USER, user),
+            storageManager.set(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString())
+          ])
+
+          // Configure HTTP token
+          await httpClient.setAuthToken(token, session.refreshToken, session.expiresAt.getTime())
+
+          // Update state
+          set((state) => {
+            state.isAuthenticated = true
+            state.isLoading = false
+            state.user = user
+            state.session = session
+            state.token = token
+            state.permissions = permissions
+            state.roles = [userRole]
+            state.lastActivity = new Date()
+            state.showLoginModal = false
+            state.loginError = null
+          })
+
+          timer.end({ success: true })
+          stateLog.info('✅ Register successful', {
+            userId: user.id,
+            email: user.email,
+            roles: [userRole]
+          })
+
+          return session
+
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Register failed'
+
+          set((state) => {
+            state.isLoading = false
+            state.loginError = errorMsg
+            state.isAuthenticated = false
+          })
+
+          timer.end({ error: errorMsg })
+          stateLog.error('❌ Register failed', { error: errorMsg })
+
+          throw new Error(errorMsg)
         }
       },
 
@@ -182,7 +318,7 @@ export const useAuthStore = create<AuthStore>()(
           // Appel API de déconnexion (si connecté)
           if (get().isAuthenticated) {
             try {
-              await httpClient.post('/api/auth/logout')
+              await AuthService.logout()
             } catch (error) {
               stateLog.warn('Logout API call failed', { error })
               // Continue avec la déconnexion locale
@@ -226,24 +362,15 @@ export const useAuthStore = create<AuthStore>()(
 
           stateLog.debug('🔄 Token refresh attempt')
 
-          const response = await httpClient.post<{
-            token: string
-            refreshToken?: string
-            expiresAt: number
-          }>('/api/auth/refresh', {
-            refreshToken: session.refreshToken
-          })
+          const response = await AuthService.refreshToken(session.refreshToken)
 
-          if (!response.success || !response.data) {
-            throw new Error('Token refresh failed')
-          }
-
-          const { token, refreshToken, expiresAt } = response.data
+          const { token, expiresAt } = response
+          const newRefreshToken = session.refreshToken // Keep existing refresh token
 
           // Mettre à jour la session
           const updatedSession: UserSession = {
             ...session,
-            refreshToken: refreshToken || session.refreshToken,
+            refreshToken: newRefreshToken,
             expiresAt: new Date(expiresAt)
           }
 
@@ -254,7 +381,7 @@ export const useAuthStore = create<AuthStore>()(
           ])
 
           // Configurer le nouveau token
-          await httpClient.setAuthToken(token, updatedSession.refreshToken, expiresAt)
+          await httpClient.setAuthToken(token, updatedSession.refreshToken, updatedSession.expiresAt.getTime())
 
           // Mettre à jour l'état
           set((state) => {
@@ -357,6 +484,28 @@ export const useAuthStore = create<AuthStore>()(
         try {
           stateLog.debug('🔧 Initializing auth store')
 
+          // 🔧 VALIDATION ET CORRECTION DE L'ÉTAT D'AUTHENTIFICATION
+          const validationResult = await authStorageFix.validateAndSyncAuthState()
+
+          if (!validationResult.isValid) {
+            stateLog.warn('⚠️ Auth state issues detected:', validationResult)
+
+            if (validationResult.fixed) {
+              stateLog.info('✅ Auth state automatically fixed')
+            } else if (validationResult.issues.some(issue => issue.includes('corrompu') || issue.includes('expiré'))) {
+              stateLog.warn('🧹 Clearing corrupted auth state')
+              await authStorageFix.clearAllAuthStorage()
+
+              set(() => ({
+                ...initialState,
+                isInitialized: true
+              }))
+
+              timer.end({ success: true, cleaned: true })
+              return
+            }
+          }
+
           // Charger les données persistées
           const [session, token, user, lastActivity] = await Promise.all([
             storageManager.get<UserSession>(STORAGE_KEYS.SESSION, { type: 'secure' }),
@@ -366,22 +515,28 @@ export const useAuthStore = create<AuthStore>()(
           ])
 
           if (session && token && user) {
+            // Restaurer les dates depuis les chaînes JSON
+            const restoredSession: UserSession = {
+              ...session,
+              expiresAt: new Date(session.expiresAt)
+            }
+
             // Vérifier si la session est encore valide
-            const isExpired = session.expiresAt ? Date.now() > session.expiresAt.getTime() : false
+            const isExpired = restoredSession.expiresAt ? Date.now() > restoredSession.expiresAt.getTime() : false
 
             if (!isExpired) {
               // Configurer le token HTTP
-              await httpClient.setAuthToken(token, session.refreshToken, session.expiresAt.getTime())
+              await httpClient.setAuthToken(token, restoredSession.refreshToken, restoredSession.expiresAt.getTime())
 
               // Restaurer l'état
               set((state) => {
                 state.isAuthenticated = true
                 state.user = user
-                state.session = session
+                state.session = restoredSession
                 state.token = token
                 state.lastActivity = lastActivity ? new Date(lastActivity) : null
-                state.permissions = session.permissions || []
-                state.roles = session.roles || []
+                state.permissions = restoredSession.permissions || []
+                state.roles = restoredSession.roles || []
               })
 
               stateLog.info('✅ Session restored', { userId: user.id })
@@ -409,6 +564,185 @@ export const useAuthStore = create<AuthStore>()(
       cleanup: () => {
         stateLog.debug('🧹 Auth store cleanup')
         set(() => initialState)
+      },
+
+      // ==================== DATA HYDRATION ====================
+
+      hydrateUserData: async () => {
+        const timer = stateLog.time('User data hydration')
+
+        try {
+          const { isAuthenticated } = get()
+          if (!isAuthenticated) {
+            throw new Error('Cannot hydrate data: user not authenticated')
+          }
+
+          stateLog.debug('🌊 Starting data hydration...')
+
+          // Appeler l'API d'hydratation
+          const hydrationData: UserHydrationData = await AuthService.hydrate()
+
+          stateLog.debug('📦 Hydration data received', {
+            machines: hydrationData.machines?.length || 0,
+            sites: hydrationData.sites?.length || 0,
+            installation: !!hydrationData.installation
+          })
+
+          // Stocker en IndexedDB de manière sécurisée
+          await database.transaction('rw', [database.machines, database.sites, database.installations], async () => {
+            // Stocker les machines
+            if (hydrationData.machines && Array.isArray(hydrationData.machines)) {
+              for (const machine of hydrationData.machines) {
+                await database.machines.put({
+                  ...machine,
+                  syncedAt: new Date()
+                })
+              }
+            }
+
+            // Stocker les sites
+            if (hydrationData.sites && Array.isArray(hydrationData.sites)) {
+              for (const site of hydrationData.sites) {
+                await database.sites.put({
+                  ...site,
+                  syncedAt: new Date()
+                })
+              }
+            }
+
+            // Stocker toutes les installations
+            if (hydrationData.installations && Array.isArray(hydrationData.installations)) {
+              for (const installation of hydrationData.installations) {
+                await database.installations.put({
+                  ...installation,
+                  syncedAt: new Date(),
+                  isActive: installation.isActive || true
+                })
+              }
+            }
+          })
+
+          // Sauvegarder la date de dernière synchronisation
+          await database.saveAppState('lastDataSync', new Date())
+
+          timer.end({ success: true })
+          stateLog.info('✅ User data hydration completed', {
+            machines: hydrationData.machines?.length || 0,
+            sites: hydrationData.sites?.length || 0,
+            installations: hydrationData.installations?.length || 0
+          })
+
+        } catch (error) {
+          timer.end({ error })
+          stateLog.error('❌ User data hydration failed', { error })
+          throw error
+        }
+      },
+
+      hydrateUserDataWithData: async (hydrationData: UserHydrationData) => {
+        const timer = stateLog.time('User data hydration with data')
+
+        try {
+          stateLog.debug('🌊 Starting data hydration with provided data...', {
+            machines: hydrationData.machines?.length || 0,
+            sites: hydrationData.sites?.length || 0,
+            installations: hydrationData.installations?.length || 0
+          })
+
+          // Stocker en IndexedDB de manière sécurisée
+          await database.transaction('rw', [database.machines, database.sites, database.installations], async () => {
+            // Stocker les machines
+            if (hydrationData.machines && Array.isArray(hydrationData.machines)) {
+              for (const machine of hydrationData.machines) {
+                await database.machines.put({
+                  id: machine.id,
+                  name: machine.name || 'Machine sans nom',
+                  macAddress: machine.macD || machine.macAddress,
+                  model: machine.model || 'trackbee',
+                  description: machine.description || '',
+                  type: machine.type || 'trackbee',
+                  isActive: machine.status !== false,
+                  lastConnectionState: machine.status ? 'connected' : 'disconnected',
+                  lastSeenAt: new Date(),
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  syncedAt: new Date()
+                })
+              }
+            }
+
+            // Stocker les sites
+            if (hydrationData.sites && Array.isArray(hydrationData.sites)) {
+              for (const site of hydrationData.sites) {
+                await database.sites.put({
+                  id: site.id,
+                  name: site.name,
+                  description: site.description || '',
+                  address: site.address || '',
+                  lat: site.lat || undefined,
+                  lng: site.lon || site.lng || undefined,
+                  altitude: site.altitude || undefined,
+                  isActive: true,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  syncedAt: new Date()
+                })
+              }
+            }
+
+            // Stocker toutes les installations
+            if (hydrationData.installations && Array.isArray(hydrationData.installations)) {
+              for (const installation of hydrationData.installations) {
+                await database.installations.put({
+                  id: installation.id,
+                  machineId: installation.machineId,
+                  siteId: installation.siteId,
+                  installationRef: installation.installationRef || '',
+                  positionIndex: installation.positionIndex || 1,
+                  installedAt: new Date(installation.installedAt || new Date()),
+                  uninstalledAt: installation.uninstalledAt ? new Date(installation.uninstalledAt) : null,
+                  isActive: !installation.uninstalledAt,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  syncedAt: new Date()
+                })
+              }
+            }
+          })
+
+          // Sauvegarder la date de dernière synchronisation
+          await database.saveAppState('lastDataSync', new Date())
+
+          timer.end({ success: true })
+          stateLog.info('✅ User data hydration with data completed', {
+            machines: hydrationData.machines?.length || 0,
+            sites: hydrationData.sites?.length || 0,
+            installations: hydrationData.installations?.length || 0
+          })
+
+        } catch (error) {
+          timer.end({ error })
+          stateLog.error('❌ User data hydration with data failed', { error })
+          throw error
+        }
+      },
+
+      refreshUserData: async () => {
+        try {
+          const lastSync = await database.getAppState<Date>('lastDataSync')
+          const now = new Date()
+
+          // Refresh toutes les 5 minutes
+          if (!lastSync || (now.getTime() - lastSync.getTime()) > 5 * 60 * 1000) {
+            stateLog.debug('🔄 Refreshing user data (5min threshold reached)')
+            await get().hydrateUserData()
+          } else {
+            stateLog.debug('⏭️ Skipping refresh - data still fresh')
+          }
+        } catch (error) {
+          stateLog.error('❌ User data refresh failed', { error })
+          // Ne pas faire échouer, c'est juste un refresh
+        }
       },
 
       // ==================== VALIDATION ====================

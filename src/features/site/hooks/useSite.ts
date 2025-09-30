@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { eventBus } from '@/core/orchestrator/EventBus'
+import { eventBus, useEventBus } from '@/core/orchestrator/EventBus'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
 import type { AppError } from '@/core/types/common'

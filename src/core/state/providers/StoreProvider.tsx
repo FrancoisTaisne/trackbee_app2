@@ -61,6 +61,26 @@ const useStoreInitialization = () => {
           // Device store n'a pas besoin d'initialisation async pour le moment
         ])
 
+        // 🔧 DIAGNOSTIC ET CORRECTION POST-INITIALISATION
+        try {
+          // Attendre un peu que l'initialisation se stabilise
+          await new Promise(resolve => setTimeout(resolve, 500))
+
+          // Importer et utiliser le correctif complet
+          const { AuthComprehensiveFix } = await import('@/core/state/stores/auth.fix.comprehensive')
+          const diagnostic = await AuthComprehensiveFix.quickDiagnostic()
+
+          stateLog.debug('🔍 Post-init auth diagnostic:', diagnostic.summary)
+
+          // Si des problèmes sont détectés, tenter une correction
+          if (diagnostic.recommendations.includes('Force reload auth state')) {
+            stateLog.info('🔧 Running post-init auth correction...')
+            await AuthComprehensiveFix.forceFullSync()
+          }
+        } catch (error) {
+          stateLog.warn('⚠️ Post-init auth diagnostic failed (non-critical)', { error })
+        }
+
         timer.end({ success: true })
         stateLog.info('✅ All stores initialized successfully')
 

@@ -21,7 +21,7 @@ interface QueryProviderProps {
 
 export const QueryProvider: React.FC<QueryProviderProps> = ({
   children,
-  showDevtools = appConfig.isDev
+  showDevtools = false // Désactivé pour éviter l'icône en bas à gauche
 }) => {
   React.useEffect(() => {
     stateLog.debug('🔧 QueryProvider mounted', { showDevtools })

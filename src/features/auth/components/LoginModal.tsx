@@ -6,7 +6,7 @@
 import React, { useState } from 'react'
 import { User, Lock, Mail, UserPlus, LogIn } from 'lucide-react'
 import { Modal, Button, Input, Badge } from '@/shared/ui/components'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '@/core/state/stores/auth.store'
 import { logger } from '@/core/utils/logger'
 import type { LoginModalProps, AuthMode, LoginCredentials, RegisterData } from '../types'
 
@@ -244,7 +244,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onLoginSuccess,
   defaultMode = 'login',
   title,
-  subtitle
+  subtitle,
+  showCloseButton = true
 }) => {
   const [mode, setMode] = useState<AuthMode>(defaultMode)
   const { login, register, isLoading, error, clearError } = useAuth()
@@ -329,6 +330,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       size="md"
       closeOnOverlayClick={!isLoading}
       closeOnEscape={!isLoading}
+      showCloseButton={showCloseButton}
       actions={modalActions}
     >
       <div className="py-2">

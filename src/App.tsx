@@ -125,7 +125,7 @@ const App: React.FC = () => {
       onError={handleError}
       onReset={handleErrorReset}
     >
-      <StateProvider showQueryDevtools={appConfig.isDev}>
+      <StateProvider showQueryDevtools={false}>
         <ThemeProvider
           defaultTheme="auto"
           enableSystem={true}

@@ -6,17 +6,15 @@
 
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Filter, Wifi, WifiOff } from 'lucide-react'
-// PUSH FINAL: Utilitaires temporaires avec any
-const cn = (...args: any[]) => args.join(' ')
-const useDeviceList: any = () => ({ devices: [], isLoading: false })
+import { Plus, Search, Filter, Wifi, WifiOff, Loader2 } from 'lucide-react'
+import { cn } from '@/shared/utils/cn'
+import { useDeviceList } from '@/features/device/hooks/useDeviceList'
 
 const DevicesListPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = React.useState('')
   const [filter, setFilter] = React.useState<'all' | 'connected' | 'disconnected'>('all')
 
-  // TODO: Utiliser le hook réel
-  const { devices, isLoading } = { devices: [], isLoading: false } // useDeviceList()
+  const { devices, isLoading, error } = useDeviceList()
 
   const filteredDevices = React.useMemo(() => {
     return devices.filter(device => {
@@ -105,10 +103,28 @@ const DevicesListPage: React.FC = () => {
         {/* Devices List */}
         {isLoading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-trackbee-500 mx-auto"></div>
+            <Loader2 className="w-8 h-8 text-trackbee-500 mx-auto mb-4 animate-spin" />
             <p className="text-gray-500 dark:text-gray-400 mt-4">
               Chargement des dispositifs...
             </p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 p-6">
+            <div className="flex items-center">
+              <div className="text-red-400">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800 dark:text-red-200">
+                  Erreur de chargement
+                </h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  Impossible de charger les dispositifs. Vérifiez votre connexion.
+                </div>
+              </div>
+            </div>
           </div>
         ) : filteredDevices.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">

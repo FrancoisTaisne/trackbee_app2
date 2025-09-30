@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDeviceStore } from '@/core/state/stores/device.store'
-import { eventBus } from '@/core/orchestrator/EventBus'
+import { eventBus, useEventBus } from '@/core/orchestrator/EventBus'
 import { bleManager } from '@/core/services/ble/BleManager'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'

@@ -1,8 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push:*)",
-      "Bash(npm install:*)"
+      "Bash(echo:*)",
+      "Bash(start http://localhost:5183)",
+      "Bash(start http://localhost:5183/test-auth-validation.html)",
+      "Bash(start http://localhost:5183/test-backend-comparison.html)",
+      "Bash(start http://localhost:5183/test-auth-backend-direct.html)"
     ],
     "deny": [],
     "ask": []

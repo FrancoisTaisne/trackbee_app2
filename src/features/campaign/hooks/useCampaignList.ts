@@ -38,42 +38,138 @@ interface CampaignListResponse {
 async function fetchCampaigns(params: CampaignListParams = {}): Promise<CampaignListResponse> {
   const { filters = {}, sorting = { field: 'createdAt', direction: 'desc' }, page = 1, limit = 20 } = params
 
-  log.debug('fetchCampaigns', { params })
+  log.debug('🔄 Fetching campaigns from IndexedDB...', { params })
 
-  const searchParams = new URLSearchParams()
+  try {
+    // Import du service centralisé pour accès aux données locales
+    const { DataService } = await import('@/core/services/data/DataService')
 
-  // Filtres
-  if (filters.siteId) searchParams.append('siteId', filters.siteId.toString())
-  if (filters.machineId) searchParams.append('machineId', filters.machineId.toString())
-  if (filters.installationId) searchParams.append('installationId', filters.installationId.toString())
-  if (filters.type) searchParams.append('type', filters.type)
-  if (filters.status?.length) {
-    filters.status.forEach(status => searchParams.append('status', status))
+    // Récupérer toutes les campagnes depuis IndexedDB
+    const allCampaigns = await DataService.getAllCampaigns()
+
+    // Appliquer les filtres côté client
+    let filteredCampaigns = allCampaigns
+
+    // Filtrage par site
+    if (filters.siteId) {
+      filteredCampaigns = filteredCampaigns.filter(campaign =>
+        campaign.siteId === filters.siteId
+      )
+    }
+
+    // Filtrage par machine
+    if (filters.machineId) {
+      filteredCampaigns = filteredCampaigns.filter(campaign =>
+        campaign.machineId === filters.machineId
+      )
+    }
+
+    // Filtrage par statut
+    if (filters.status?.length) {
+      filteredCampaigns = filteredCampaigns.filter(campaign =>
+        filters.status!.includes(campaign.status)
+      )
+    }
+
+    // Filtrage par type
+    if (filters.type) {
+      filteredCampaigns = filteredCampaigns.filter(campaign =>
+        campaign.type === filters.type
+      )
+    }
+
+    // Filtrage par recherche textuelle
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase()
+      filteredCampaigns = filteredCampaigns.filter(campaign =>
+        campaign.name?.toLowerCase().includes(searchLower) ||
+        campaign.description?.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Tri
+    const sortedCampaigns = sortCampaigns(filteredCampaigns, sorting)
+
+    // Pagination côté client
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+    const campaigns = sortedCampaigns.slice(startIndex, endIndex)
+
+    const response: CampaignListResponse = {
+      campaigns,
+      pagination: {
+        page,
+        limit,
+        total: filteredCampaigns.length,
+        hasMore: endIndex < filteredCampaigns.length
+      }
+    }
+
+    log.info('✅ Campaigns loaded from IndexedDB', {
+      count: campaigns.length,
+      total: response.pagination.total,
+      hasMore: response.pagination.hasMore
+    })
+
+    return response
+
+  } catch (error) {
+    log.error('❌ Failed to fetch campaigns from IndexedDB', { error })
+
+    // Fallback: essayer de récupérer depuis l'API si la DB locale échoue
+    log.warn('🔄 Falling back to API for campaigns...')
+
+    try {
+      const searchParams = new URLSearchParams()
+
+      // Filtres
+      if (filters.siteId) searchParams.append('siteId', filters.siteId.toString())
+      if (filters.machineId) searchParams.append('machineId', filters.machineId.toString())
+      if (filters.installationId) searchParams.append('installationId', filters.installationId.toString())
+      if (filters.type) searchParams.append('type', filters.type)
+      if (filters.status?.length) {
+        filters.status.forEach(status => searchParams.append('status', status))
+      }
+      if (filters.dateRange) {
+        searchParams.append('dateFrom', filters.dateRange.from)
+        searchParams.append('dateTo', filters.dateRange.to)
+      }
+      if (filters.tags?.length) {
+        filters.tags.forEach(tag => searchParams.append('tags', tag))
+      }
+      if (filters.search) searchParams.append('search', filters.search)
+
+      // Tri et pagination
+      searchParams.append('sortField', sorting.field)
+      searchParams.append('sortDirection', sorting.direction)
+      searchParams.append('page', page.toString())
+      searchParams.append('limit', limit.toString())
+
+      const response = await httpClient.get<CampaignListResponse>(`/api/campaigns?${searchParams}`)
+
+      log.warn('⚠️ Campaigns loaded from API fallback', {
+        count: response.campaigns.length,
+        total: response.pagination.total,
+        hasMore: response.pagination.hasMore
+      })
+
+      return response
+
+    } catch (apiError) {
+      log.error('❌ Both IndexedDB and API failed for campaigns', { apiError })
+
+      // Retourner une réponse vide en cas d'échec total
+      return {
+        campaigns: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          hasMore: false
+        }
+      }
+    }
   }
-  if (filters.dateRange) {
-    searchParams.append('dateFrom', filters.dateRange.from)
-    searchParams.append('dateTo', filters.dateRange.to)
-  }
-  if (filters.tags?.length) {
-    filters.tags.forEach(tag => searchParams.append('tags', tag))
-  }
-  if (filters.search) searchParams.append('search', filters.search)
-
-  // Tri et pagination
-  searchParams.append('sortField', sorting.field)
-  searchParams.append('sortDirection', sorting.direction)
-  searchParams.append('page', page.toString())
-  searchParams.append('limit', limit.toString())
-
-  const response = await httpClient.get<CampaignListResponse>(`/api/campaigns?${searchParams}`)
-
-  log.info('Campaigns loaded', {
-    count: response.campaigns.length,
-    total: response.pagination.total,
-    hasMore: response.pagination.hasMore
-  })
-
-  return response
 }
 
 async function createCampaign(data: CreateCampaignData): Promise<Campaign> {

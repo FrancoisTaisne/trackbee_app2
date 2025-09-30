@@ -105,63 +105,63 @@ const publicRoutes = [
 
 const protectedRoutes = [
   {
-    path: '/dashboard',
+    path: 'dashboard',
     element: <DashboardPage />
   },
 
   // Routes Devices
   {
-    path: '/devices',
+    path: 'devices',
     element: <DevicesListPage />
   },
   {
-    path: '/devices/:deviceId',
+    path: 'devices/:deviceId',
     element: <DeviceDetailPage />
   },
 
   // Routes Sites
   {
-    path: '/sites',
+    path: 'sites',
     element: <SitesListPage />
   },
   {
-    path: '/sites/:siteId',
+    path: 'sites/:siteId',
     element: <SiteDetailPage />
   },
 
   // Routes Campaigns
   {
-    path: '/campaigns',
+    path: 'campaigns',
     element: <CampaignsListPage />
   },
   {
-    path: '/campaigns/:campaignId',
+    path: 'campaigns/:campaignId',
     element: <CampaignDetailPage />
   },
 
   // Routes Processing
   {
-    path: '/processing',
+    path: 'processing',
     element: <ProcessingListPage />
   },
   {
-    path: '/processing/:calculationId',
+    path: 'processing/:calculationId',
     element: <ProcessingDetailPage />
   },
 
   // Routes Transfer
   {
-    path: '/transfers',
+    path: 'transfers',
     element: <TransferQueuePage />
   },
 
   // Routes Settings
   {
-    path: '/settings',
+    path: 'settings',
     element: <SettingsPage />
   },
   {
-    path: '/profile',
+    path: 'profile',
     element: <ProfilePage />
   }
 ]
@@ -216,8 +216,8 @@ export const AppRouter: React.FC = () => {
                   ))}
 
                   {/* Redirections */}
-                  <Route path="/app" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/app/*" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="app" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="app/*" element={<Navigate to="/dashboard" replace />} />
 
                   {/* 404 pour les routes protégées */}
                   <Route

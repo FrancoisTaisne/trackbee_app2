@@ -28,6 +28,16 @@ export interface AppLayoutProps {
   headerActions?: React.ReactNode
 
   /**
+   * Callback pour ouvrir le modal de connexion
+   */
+  onOpenLogin?: () => void
+
+  /**
+   * Callback pour naviguer vers le profil
+   */
+  onOpenProfile?: () => void
+
+  /**
    * Afficher la sidebar (desktop)
    */
   showSidebar?: boolean
@@ -84,6 +94,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   children,
   title,
   headerActions,
+  onOpenLogin,
+  onOpenProfile,
   showSidebar = true,
   showMobileNav = true,
   fullscreen = false,
@@ -110,6 +122,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       <Header
         title={title}
         actions={headerActions}
+        onOpenLogin={onOpenLogin}
+        onOpenProfile={onOpenProfile}
         onMenuClick={() => setSidebarOpen(true)}
         showMenuButton={showSidebar}
       />

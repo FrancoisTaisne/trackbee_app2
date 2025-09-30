@@ -1,0 +1,346 @@
+openapi: 3.0.3
+info:
+  title: TrackBee API Contract
+  description: Contrat API définissant les spécifications exactes attendues par le frontend
+  version: 2.0.0
+  contact:
+    name: TrackBee Frontend Team
+
+servers:
+  - url: http://localhost:3313
+    description: Development server
+
+paths:
+  /api/auth/signin:
+    post:
+      summary: Authentification utilisateur
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "moderator1@test.com"
+                password:
+                  type: string
+                  example: "test"
+      responses:
+        '200':
+          description: Authentification réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, token, user, expiresAt]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIs..."
+                  user:
+                    $ref: '#/components/schemas/User'
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    example: "2025-09-26T13:47:35.195Z"
+                  refreshToken:
+                    type: string
+                    example: "8298f3ebf13e439fb5d02a821d8e596b..."
+                  # Données étendues pour hydratation
+                  machines:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Machine'
+                  sites:
+                    $ref: '#/components/schemas/SitesData'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/auth/logout:
+    post:
+      summary: Déconnexion utilisateur
+      tags: [Authentication]
+      security:
+        - TokenAuth: []
+      responses:
+        '200':
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/me/hydrate:
+    get:
+      summary: Hydratation des données utilisateur
+      tags: [User]
+      security:
+        - TokenAuth: []
+      responses:
+        '200':
+          description: Données utilisateur hydratées
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserHydrationData'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /rgp/search-base:
+    get:
+      summary: Recherche stations de base RGP
+      tags: [RGP]
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+          example: 48.8566
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+          example: 2.3522
+        - name: radius
+          in: query
+          required: true
+          schema:
+            type: number
+            format: int32
+          example: 50000
+      responses:
+        '200':
+          description: Stations trouvées
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  stations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RGPStation'
+
+components:
+  securitySchemes:
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: x-access-token
+
+  schemas:
+    User:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: "moderator1@test.com"
+        role:
+          type: string
+          enum: [admin, user, viewer]
+          example: "admin"
+        name:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        avatar:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Machine:
+      type: object
+      properties:
+        id:
+          type: integer
+        macD:
+          type: string
+        status:
+          type: boolean
+        belongsToSite:
+          type: boolean
+        installation:
+          $ref: '#/components/schemas/Installation'
+        site:
+          $ref: '#/components/schemas/Site'
+
+    Installation:
+      type: object
+      properties:
+        id:
+          type: integer
+        installationRef:
+          type: string
+        positionIndex:
+          type: integer
+        siteId:
+          type: integer
+        installedAt:
+          type: string
+          format: date-time
+
+    Site:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        lat:
+          type: number
+          format: float
+          nullable: true
+        lon:
+          type: number
+          format: float
+          nullable: true
+
+    SitesData:
+      type: object
+      properties:
+        owned:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/Site'
+              - type: object
+                properties:
+                  installations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Installation'
+        shared:
+          type: object
+          properties:
+            viewer:
+              type: array
+              items:
+                $ref: '#/components/schemas/Site'
+            editor:
+              type: array
+              items:
+                $ref: '#/components/schemas/Site'
+
+    UserHydrationData:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: integer
+            email:
+              type: string
+            roles:
+              type: array
+              items:
+                type: string
+        - type: object
+          properties:
+            machines:
+              type: array
+              items:
+                $ref: '#/components/schemas/Machine'
+            sites:
+              $ref: '#/components/schemas/SitesData'
+
+    RGPStation:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        lat:
+          type: number
+        lng:
+          type: number
+        distance:
+          type: number
+
+  responses:
+    BadRequest:
+      description: Requête invalide
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Missing credentials."
+
+    Unauthorized:
+      description: Non autorisé
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Invalid Password!"
+
+    Forbidden:
+      description: Accès refusé
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "No token provided!"
+
+    NotFound:
+      description: Ressource non trouvée
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "User Not found."

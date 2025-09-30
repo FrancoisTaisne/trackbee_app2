@@ -39,54 +39,93 @@ const deviceListLog = {
 // ==================== API FUNCTIONS ====================
 
 /**
- * Récupère tous les devices avec leurs relations
+ * Récupère tous les devices avec leurs relations depuis IndexedDB
  */
 const fetchDeviceBundles = async (): Promise<DeviceBundle[]> => {
-  deviceListLog.debug('Fetching device bundles')
+  deviceListLog.debug('🔄 Fetching device bundles from IndexedDB...')
 
-  // Récupérer toutes les données en parallèle
-  const [machines, installations, sites] = await Promise.all([
-    httpClient.get<Machine[]>('/api/machines'),
-    httpClient.get<Installation[]>('/api/installations'),
-    httpClient.get<Site[]>('/api/sites')
-  ])
+  try {
+    // Import du service centralisé pour accès aux données locales
+    const { DataService } = await import('@/core/services/data/DataService')
 
-  // Créer un map pour optimiser les lookups
-  const installationsByMachine = new Map<number, Installation>()
-  const sitesById = new Map<number, Site>()
+    // Récupérer les bundles depuis la base de données locale
+    const bundles = await DataService.buildDeviceBundles()
 
-  installations.forEach(installation => {
-    installationsByMachine.set(installation.machineId, installation)
-  })
+    // Transformer le format pour correspondre aux types attendus
+    const deviceBundles: DeviceBundle[] = bundles.map(bundle => ({
+      machine: {
+        id: bundle.id,
+        name: bundle.name,
+        macAddress: bundle.macAddress,
+        model: bundle.model,
+        isActive: bundle.isActive,
+        lastConnectionState: bundle.connected ? 'connected' : 'disconnected',
+        lastSeenAt: bundle.lastSeenAt,
+        description: '', // Default
+        type: 'trackbee', // Default
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      installation: bundle.installation ? {
+        id: bundle.installation.id,
+        machineId: bundle.id,
+        siteId: bundle.site?.id || 0,
+        isActive: bundle.installation.isActive,
+        installedAt: bundle.installation.installedAt,
+        createdAt: bundle.installation.installedAt,
+        updatedAt: bundle.installation.installedAt
+      } : undefined,
+      site: bundle.site ? {
+        id: bundle.site.id,
+        name: bundle.site.name,
+        description: '', // Default
+        coordinates: bundle.site.location?.latitude && bundle.site.location?.longitude ? {
+          latitude: bundle.site.location.latitude,
+          longitude: bundle.site.location.longitude
+        } : undefined,
+        address: '', // Default
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      } : undefined,
+      campaigns: [], // TODO: Implémenter récupération campaigns depuis IndexedDB
+      calculations: [] // TODO: Implémenter récupération calculations depuis IndexedDB
+    }))
 
-  sites.forEach(site => {
-    sitesById.set(site.id, site)
-  })
+    deviceListLog.info('✅ Device bundles fetched from IndexedDB', { count: deviceBundles.length })
+    return deviceBundles
 
-  // Construire les bundles
-  const bundles: DeviceBundle[] = await Promise.all(
-    machines.map(async (machine) => {
-      const installation = installationsByMachine.get(machine.id)
-      const site = installation ? sitesById.get(installation.siteId) : undefined
+  } catch (error) {
+    deviceListLog.error('❌ Failed to fetch device bundles from IndexedDB', { error })
 
-      // Récupérer les campaigns et calculations pour ce device
-      const [campaigns, calculations] = await Promise.all([
-        httpClient.get(`/api/machines/${machine.id}/campaigns`).catch(() => []),
-        httpClient.get(`/api/machines/${machine.id}/calculations`).catch(() => [])
+    // Fallback: essayer de récupérer depuis l'API si la DB locale échoue
+    deviceListLog.warn('🔄 Falling back to API for device bundles...')
+
+    try {
+      const { MachineService, SiteService } = await import('@/core/services/api/services')
+
+      const [machines, sites] = await Promise.all([
+        MachineService.list(),
+        SiteService.list()
       ])
 
-      return {
+      // Construire des bundles basiques depuis l'API
+      const apiBundles: DeviceBundle[] = machines.map(machine => ({
         machine,
-        installation,
-        site,
-        campaigns,
-        calculations
-      }
-    })
-  )
+        installation: undefined,
+        site: undefined,
+        campaigns: [],
+        calculations: []
+      }))
 
-  deviceListLog.debug('Device bundles fetched', { count: bundles.length })
-  return bundles
+      deviceListLog.warn('⚠️ Device bundles fetched from API fallback', { count: apiBundles.length })
+      return apiBundles
+
+    } catch (apiError) {
+      deviceListLog.error('❌ Both IndexedDB and API failed for device bundles', { apiError })
+      return []
+    }
+  }
 }
 
 /**

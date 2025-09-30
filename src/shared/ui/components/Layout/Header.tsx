@@ -7,6 +7,9 @@ import React from 'react'
 import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/components/Button/Button'
 import { Badge } from '@/shared/ui/components/Badge/Badge'
+import { ProfileButton } from './ProfileButton'
+import AuthHydrationDiagnostic from '@/debug/AuthHydrationDiagnostic'
+import ComprehensiveHydrationAnalyzer from '@/debug/ComprehensiveHydrationAnalyzer'
 
 // ==================== TYPES ====================
 
@@ -22,7 +25,7 @@ export interface HeaderProps {
   logo?: React.ReactNode
 
   /**
-   * Actions à droite du header
+   * Actions à droite du header (avant le profil)
    */
   actions?: React.ReactNode
 
@@ -40,6 +43,16 @@ export interface HeaderProps {
    * Notifications badge
    */
   notificationCount?: number
+
+  /**
+   * Callback pour ouvrir le modal de connexion
+   */
+  onOpenLogin?: () => void
+
+  /**
+   * Callback pour naviguer vers le profil
+   */
+  onOpenProfile?: () => void
 
   /**
    * Mode compact (hauteur réduite)
@@ -61,6 +74,8 @@ export const Header: React.FC<HeaderProps> = ({
   onMenuClick,
   showMenuButton = false,
   notificationCount = 0,
+  onOpenLogin,
+  onOpenProfile,
   compact = false,
   className
 }) => {
@@ -79,15 +94,20 @@ export const Header: React.FC<HeaderProps> = ({
   )
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-700',
-        'bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60',
-        'dark:supports-[backdrop-filter]:bg-gray-900/60',
-        compact ? 'h-14' : 'h-16',
-        className
-      )}
-    >
+    <>
+      {/* DEBUG PANELS TEMPORAIRES */}
+      <AuthHydrationDiagnostic />
+      <ComprehensiveHydrationAnalyzer />
+
+      <header
+        className={cn(
+          'sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-700',
+          'bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60',
+          'dark:supports-[backdrop-filter]:bg-gray-900/60',
+          compact ? 'h-14' : 'h-16',
+          className
+        )}
+      >
       <div className="mx-auto flex h-full items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left Section */}
         <div className="flex items-center space-x-4">
@@ -142,9 +162,16 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Custom Actions */}
           {actions}
+
+          {/* Profile Button */}
+          <ProfileButton
+            onOpenLogin={onOpenLogin}
+            onOpenProfile={onOpenProfile}
+          />
         </div>
       </div>
     </header>
+    </>
   )
 }
 
@@ -311,10 +338,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 /**
  * Exemples d'utilisation:
  *
- * // Header basique
+ * // Header basique avec profil
  * <Header
  *   title="Dashboard"
  *   notificationCount={3}
+ *   onOpenLogin={() => setShowLoginModal(true)}
+ *   onOpenProfile={() => navigate('/profile')}
  *   actions={
  *     <Button variant="primary" size="sm">
  *       Nouveau
