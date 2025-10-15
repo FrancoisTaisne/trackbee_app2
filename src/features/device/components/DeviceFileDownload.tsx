@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * DeviceFileDownload Component - Interface de téléchargement des fichiers IoT
  * Gestion du téléchargement des fichiers .ubx depuis les devices TrackBee
@@ -13,8 +12,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  HardDrive,
-  Wifi
+  HardDrive
 } from 'lucide-react'
 import {
   Button,
@@ -66,9 +64,13 @@ const initialDownloadState: DownloadState = {
   startTime: null
 }
 
+// ==================== HELPERS ====================
+
+const isValidDeviceId = (deviceId: number): boolean => Number.isInteger(deviceId) && deviceId > 0
+
 // ==================== MAIN COMPONENT ====================
 
-export const DeviceFileDownload: React.FC<DeviceFileDownloadProps> = ({
+const DeviceFileDownloadInner: React.FC<DeviceFileDownloadProps> = ({
   deviceId,
   campaignId,
   onDownloadComplete,
@@ -103,8 +105,7 @@ export const DeviceFileDownload: React.FC<DeviceFileDownloadProps> = ({
     try {
       const result = await probeFiles({
         machineId: deviceId,
-        campaignId,
-        includeMetadata: true
+        campaignId
       })
 
       if (result.success) {
@@ -162,62 +163,57 @@ export const DeviceFileDownload: React.FC<DeviceFileDownloadProps> = ({
 
     try {
       const result = await downloadFiles({
-        campaignId,
-        files: availableFiles,
-        onProgress: (progress, fileName) => {
+        fileIds: availableFiles,
+        onProgress: (progress) => {
           setDownloadState(prev => {
             const elapsed = Date.now() - startTime
-            const estimatedTotal = elapsed / (progress / 100)
-            const estimatedRemaining = Math.max(0, estimatedTotal - elapsed)
+            const estimatedTotal = progress.percent > 0
+              ? elapsed / (progress.percent / 100)
+              : null
+            const estimatedRemaining = estimatedTotal
+              ? Math.max(0, estimatedTotal - elapsed)
+              : null
+            const completedCount = Math.max(progress.current, prev.completedFiles.length)
 
             return {
               ...prev,
-              progress,
-              currentFile: fileName,
-              estimatedTimeRemaining: estimatedRemaining
+              progress: progress.percent,
+              completedFiles: availableFiles.slice(0, completedCount),
+              estimatedTimeRemaining: estimatedRemaining ?? prev.estimatedTimeRemaining,
+              currentFile: null
             }
           })
-        },
-        onFileComplete: (fileName, data) => {
-          setDownloadState(prev => ({
-            ...prev,
-            completedFiles: [...prev.completedFiles, fileName],
-            downloadedSize: prev.downloadedSize + data.length,
-            currentFile: null
-          }))
-
-          downloadLog.debug('File download completed', {
-            fileName,
-            size: data.length,
-            deviceId
-          })
-        },
-        onComplete: (files) => {
-          setDownloadState(prev => ({
-            ...prev,
-            isDownloading: false,
-            progress: 100,
-            currentFile: null
-          }))
-
-          downloadLog.info('All files downloaded successfully', {
-            deviceId,
-            fileCount: files.length,
-            duration: Date.now() - startTime
-          })
-
-          onDownloadComplete?.(files)
-        },
-        onError: (error, fileName) => {
-          setDownloadState(prev => ({
-            ...prev,
-            failedFiles: fileName ? [...prev.failedFiles, fileName] : prev.failedFiles
-          }))
-
-          downloadLog.error('File download error', { deviceId, fileName, error })
-          onError?.(error)
         }
       })
+
+      const completedCount = Math.min(result.downloadedFiles, availableFiles.length)
+      const completedList = availableFiles.slice(0, completedCount)
+      const failedList = result.failedFiles > 0
+        ? availableFiles.slice(completedCount, completedCount + result.failedFiles)
+        : []
+
+      setDownloadState(prev => ({
+        ...prev,
+        isDownloading: false,
+        progress: result.success ? 100 : prev.progress,
+        currentFile: null,
+        estimatedTimeRemaining: null,
+        completedFiles: completedList,
+        failedFiles: failedList
+      }))
+
+      downloadLog.info('File download completed', {
+        deviceId,
+        downloadedFiles: result.downloadedFiles,
+        failedFiles: result.failedFiles,
+        duration: Date.now() - startTime
+      })
+
+      if (result.success) {
+        onDownloadComplete?.(completedList)
+      } else {
+        onError?.(new Error('File download did not complete successfully'))
+      }
 
       if (result.success) {
         // Rafraîchir la liste des fichiers après téléchargement
@@ -445,6 +441,28 @@ export const DeviceFileDownload: React.FC<DeviceFileDownloadProps> = ({
       </CardContent>
     </Card>
   )
+}
+
+export const DeviceFileDownload: React.FC<DeviceFileDownloadProps> = (props) => {
+  if (!isValidDeviceId(props.deviceId)) {
+    downloadLog.warn('DeviceFileDownload skipped rendering for invalid device id', {
+      deviceId: props.deviceId
+    })
+
+    return (
+      <Card className={props.className}>
+        <CardHeader>
+          <CardTitle className="text-sm">Téléchargement fichiers</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center space-x-2 text-sm text-gray-500">
+          <AlertCircle className="w-4 h-4 text-gray-400" />
+          <span>Device non disponible</span>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return <DeviceFileDownloadInner {...props} />
 }
 
 // ==================== DISPLAY NAME ====================

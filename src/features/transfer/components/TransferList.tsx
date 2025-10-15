@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Transfer List Component
  * Liste des transferts avec contrôles et filtres
@@ -13,10 +12,16 @@ import {
 import { logger } from '@/core/utils/logger'
 import { useTransferList, formatTransferSize, formatTransferSpeed, formatTransferTime } from '../hooks'
 import type {
-  TransferListProps, Transfer, TransferFilters, CreateTransferData
+  TransferListProps,
+  Transfer,
+  TransferFilters,
+  TransferProtocol,
+  TransferDirection,
+  TransferStatus,
+  TransferSorting
 } from '../types'
 import {
-  TRANSFER_PROTOCOLS, TRANSFER_STATUS_LABELS, TRANSFER_PRIORITIES
+  TRANSFER_PROTOCOLS, TRANSFER_STATUS_LABELS
 } from '../types'
 
 const log = logger.extend('TransferList')
@@ -53,7 +58,7 @@ export function TransferList({
   direction,
   filters: initialFilters,
   onTransferSelect,
-  onTransferCreate,
+  onTransferCreate: _onTransferCreate,
   className = ''
 }: TransferListProps) {
   const [selectedTransfers, setSelectedTransfers] = useState<Set<string>>(new Set())
@@ -550,11 +555,12 @@ function TransferRow({ transfer, isSelected, onSelect, onAction }: TransferRowPr
 interface FilterPanelProps {
   filters: TransferFilters
   onFiltersChange: (filters: Partial<TransferFilters>) => void
-  sorting: any
-  onSortingChange: (sorting: any) => void
+  sorting: TransferSorting
+  onSortingChange: (sorting: TransferSorting) => void
 }
 
 function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: FilterPanelProps) {
+  void sorting
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -565,7 +571,9 @@ function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: Fil
           </label>
           <select
             value={filters.protocol || ''}
-            onChange={(e) => onFiltersChange({ protocol: e.target.value || undefined })}
+            onChange={(e) => onFiltersChange({
+              protocol: e.target.value ? (e.target.value as TransferProtocol) : undefined
+            })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Tous les protocoles</option>
@@ -582,7 +590,9 @@ function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: Fil
           </label>
           <select
             value={filters.direction || ''}
-            onChange={(e) => onFiltersChange({ direction: e.target.value || undefined })}
+            onChange={(e) => onFiltersChange({
+              direction: e.target.value ? (e.target.value as TransferDirection) : undefined
+            })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Toutes les directions</option>
@@ -599,7 +609,7 @@ function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: Fil
           <select
             value={filters.status?.[0] || ''}
             onChange={(e) => onFiltersChange({
-              status: e.target.value ? [e.target.value as any] : undefined
+              status: e.target.value ? [e.target.value as TransferStatus] : undefined
             })}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >

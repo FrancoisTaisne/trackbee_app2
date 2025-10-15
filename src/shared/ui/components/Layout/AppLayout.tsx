@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { cn } from '@/shared/utils/cn'
-import { Header } from './Header'
+import { Header, Breadcrumb, type BreadcrumbItem } from './Header'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 
@@ -208,7 +208,9 @@ export interface PageHeaderProps {
   title: string
   description?: string
   actions?: React.ReactNode
+  action?: React.ReactNode
   breadcrumb?: React.ReactNode
+  breadcrumbs?: BreadcrumbItem[]
   className?: string
 }
 
@@ -216,36 +218,43 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   title,
   description,
   actions,
+  action,
   breadcrumb,
+  breadcrumbs,
   className
-}) => (
-  <div className={cn('mb-6', className)}>
-    {breadcrumb && (
-      <div className="mb-2">
-        {breadcrumb}
-      </div>
-    )}
+}) => {
+  const resolvedBreadcrumb = breadcrumb ?? (breadcrumbs?.length ? <Breadcrumb items={breadcrumbs} /> : null)
+  const resolvedActions = actions ?? action
 
-    <div className="flex items-start justify-between">
-      <div className="flex-1 min-w-0">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {description}
-          </p>
-        )}
-      </div>
-
-      {actions && (
-        <div className="ml-4 flex-shrink-0">
-          {actions}
+  return (
+    <div className={cn('mb-6', className)}>
+      {resolvedBreadcrumb && (
+        <div className="mb-2">
+          {resolvedBreadcrumb}
         </div>
       )}
+
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+              {description}
+            </p>
+          )}
+        </div>
+
+        {resolvedActions && (
+          <div className="ml-4 flex-shrink-0">
+            {resolvedActions}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 // ==================== SECTION ====================
 

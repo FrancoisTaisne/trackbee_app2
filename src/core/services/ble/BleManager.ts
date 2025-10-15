@@ -12,11 +12,10 @@ import type {
 } from '@/core/types/transport'
 import type { MachineId, FileMeta } from '@/core/types/domain'
 import { bleLog, logger } from '@/core/utils/logger'
-import { macUtils, idUtils } from '@/core/utils/ids'
+import { macUtils } from '@/core/utils/ids'
 import { withTimeout, withRetry, sleep } from '@/core/utils/time'
 import { CONSTANTS, appConfig } from '@/core/utils/env'
 import { BleCommandSchema, BleNotificationSchema, safeParseWithLog } from '@/core/types/transport'
-import { z } from 'zod'
 
 // ==================== TYPES INTERNES ====================
 
@@ -63,6 +62,30 @@ interface CommandOptions {
   ensureNotifications?: boolean
 }
 
+interface WifiInfo {
+  ssid?: string
+  password?: string
+  serverUrl?: string
+  proto?: string
+  fw?: string
+}
+
+interface BleAdvertisementResult {
+  device?: {
+    deviceId?: string
+    name?: string
+  }
+  deviceId?: string
+  localName?: string
+  name?: string
+  rssi?: number
+}
+
+interface BleDataValue {
+  buffer?: ArrayBuffer
+  value?: string
+}
+
 // ==================== BLE MANAGER CLASS ====================
 
 export class BleManager {
@@ -75,7 +98,6 @@ export class BleManager {
   constructor() {
     bleLog.debug('BleManager initialized')
   }
-
   // ==================== PUBLIC API ====================
 
   /**
@@ -271,7 +293,7 @@ export class BleManager {
         {
           maxRetries: retryCount,
           delayMs: 1000,
-          onError: (error: any, attempt: any) => {
+          onError: (error: Error | unknown, attempt: number) => {
             bleLog.warn(`Connection attempt ${attempt} failed, retrying...`, { error })
           }
         }
@@ -444,11 +466,12 @@ export class BleManager {
       }
 
       connection.lastActivity = new Date()
-      timer.end({ responseType: (response as any)?.type })
+      const responseType = response ? (response as BleNotification).type : undefined
+      timer.end({ responseType })
 
       bleLog.debug('✅ Command completed successfully', {
         command: validCommand.cmd,
-        responseType: (response as any)?.type
+        responseType
       })
 
       return response
@@ -474,7 +497,7 @@ export class BleManager {
     deviceId: string,
     campaignId: number,
     options: { withWifiRequest?: boolean } = {}
-  ): Promise<{ count: number; files: FileMeta[]; wifiInfo?: any }> {
+  ): Promise<{ count: number; files: FileMeta[]; wifiInfo?: WifiInfo }> {
     bleLog.debug('🔍 Probing files', { deviceId, campaignId, options })
 
     const command: BleCommand = {
@@ -573,7 +596,7 @@ export class BleManager {
 
   // ==================== PRIVATE METHODS ====================
 
-  private parseAdvertisement(result: any, knownMacs: string[]): BleDeviceInfo | null {
+  private parseAdvertisement(result: BleAdvertisementResult, knownMacs: string[]): BleDeviceInfo | null {
     try {
       const deviceId = result?.device?.deviceId || result?.deviceId
       const name = result?.localName || result?.name || result?.device?.name || ''
@@ -694,13 +717,14 @@ export class BleManager {
     }
   }
 
-  private valueToUint8Array(value: any): Uint8Array | null {
+  private valueToUint8Array(value: BleDataValue | string | unknown): Uint8Array | null {
     try {
-      if (value?.buffer) {
-        return new Uint8Array(value.buffer)
+      const val = value as BleDataValue
+      if (val?.buffer) {
+        return new Uint8Array(val.buffer)
       }
-      if (typeof value?.value === 'string') {
-        const binary = atob(value.value)
+      if (typeof val?.value === 'string') {
+        const binary = atob(val.value)
         const bytes = new Uint8Array(binary.length)
         for (let i = 0; i < binary.length; i++) {
           bytes[i] = binary.charCodeAt(i)
@@ -722,7 +746,7 @@ export class BleManager {
     }
   }
 
-  private emitEvent(type: SystemEvent['type'], data: any): void {
+  private emitEvent(type: SystemEvent['type'], data: unknown): void {
     const event = { type, data } as SystemEvent
     this.eventListeners.forEach(listener => {
       try {
@@ -757,3 +781,5 @@ export const bleManager = new BleManager()
 
 // Types exportés
 export type { BleConnection, BleDeviceInfo, ScanOptions, ConnectOptions, CommandOptions }
+
+

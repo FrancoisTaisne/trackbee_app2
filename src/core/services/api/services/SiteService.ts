@@ -6,6 +6,7 @@
 import { httpClient } from '../HttpClient'
 import { API_ENDPOINTS } from '../endpoints'
 import type { Site } from '@/core/types'
+import { apiLog } from '@/core/utils/logger'
 
 // ==================== TYPES ====================
 
@@ -21,7 +22,7 @@ export interface CreateSiteData {
   postalCode?: string
 }
 
-export interface UpdateSiteData extends Partial<CreateSiteData> {}
+export type UpdateSiteData = Partial<CreateSiteData>
 
 export interface ShareSiteData {
   userId: number
@@ -36,6 +37,15 @@ export interface SiteWithMachines extends Site {
     status: string
     installedAt: string
   }>
+}
+
+// Extended site with optional fields from backend
+export interface SiteExtended extends Site {
+  country?: string
+  region?: string
+  city?: string
+  latitude?: number
+  longitude?: number
 }
 
 // ==================== SITE SERVICE ====================
@@ -222,16 +232,18 @@ export class SiteService {
     const sites = await this.list()
 
     return sites.filter(site => {
+      const extendedSite = site as SiteExtended
+
       if (filters.name && !site.name.toLowerCase().includes(filters.name.toLowerCase())) {
         return false
       }
-      if (filters.country && site.country !== filters.country) {
+      if (filters.country && extendedSite.country !== filters.country) {
         return false
       }
-      if (filters.region && site.region !== filters.region) {
+      if (filters.region && extendedSite.region !== filters.region) {
         return false
       }
-      if (filters.city && site.city !== filters.city) {
+      if (filters.city && extendedSite.city !== filters.city) {
         return false
       }
 
@@ -240,8 +252,8 @@ export class SiteService {
         const distance = this.calculateDistance(
           filters.centerLat,
           filters.centerLng,
-          site.latitude,
-          site.longitude
+          extendedSite.latitude ?? site.lat ?? 0,
+          extendedSite.longitude ?? site.lng ?? 0
         )
         if (distance > filters.radius) {
           return false
@@ -294,12 +306,16 @@ export class SiteService {
     let totalMachines = 0
 
     for (const site of sites) {
+      const extendedSite = site as SiteExtended
+
       // Statistiques par pays et région
-      if (site.country) {
-        stats.byCountry[site.country] = (stats.byCountry[site.country] || 0) + 1
+      if (extendedSite.country) {
+        const country = extendedSite.country
+        stats.byCountry[country] = (stats.byCountry[country] || 0) + 1
       }
-      if (site.region) {
-        stats.byRegion[site.region] = (stats.byRegion[site.region] || 0) + 1
+      if (extendedSite.region) {
+        const region = extendedSite.region
+        stats.byRegion[region] = (stats.byRegion[region] || 0) + 1
       }
 
       // Compter les machines actives
@@ -311,7 +327,7 @@ export class SiteService {
         }
       } catch (error) {
         // Ignorer les erreurs pour continuer le calcul des stats
-        console.warn(`Failed to get machines for site ${site.id}:`, error)
+        apiLog.warn('Failed to get machines for site', { siteId: site.id, error })
       }
     }
 

@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * DeviceListPage Component - Page de liste des devices IoT
  * Interface principale pour visualiser, gérer et scanner des devices TrackBee
@@ -9,7 +8,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus,
   Search,
-  Filter,
   Bluetooth,
   MapPin,
   Settings,
@@ -18,39 +16,25 @@ import {
   Trash2,
   ExternalLink
 } from 'lucide-react'
-// PUSH FINAL: Composants UI temporaires avec any pour déblocage massif
-const AppLayout: any = 'div'
-const PageHeader: any = 'div'
-const Section: any = 'div'
-const Card: any = 'div'
-const CardHeader: any = 'div'
-const CardTitle: any = 'h3'
-const CardContent: any = 'div'
-const Button: any = 'button'
-const Input: any = 'input'
-const Badge: any = 'span'
-const DropdownMenu: any = 'div'
-const DropdownMenuTrigger: any = 'button'
-const DropdownMenuContent: any = 'div'
-const DropdownMenuItem: any = 'button'
-const ConfirmationModal: any = 'div'
 
-// PUSH FINAL: Composants device temporaires avec any
-const DeviceConnectionPill: any = 'div'
-const DeviceScanModal: any = 'div'
-const DeviceFileDownload: any = 'div'
+// UI Components imports
+import { AppLayout, PageHeader, Section } from '@/shared/ui/components/Layout'
+import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/components/Card/Card'
+import { Button } from '@/shared/ui/components/Button/Button'
+import { Input } from '@/shared/ui/components/Input/Input'
+import { Badge } from '@/shared/ui/components/Badge/Badge'
+import { ConfirmationModal } from '@/shared/ui/components/Modal/Modal'
 
-const useDeviceList: any = () => ({})
+// Device feature imports
+import { useDeviceList } from '../hooks/useDeviceList'
+import { DeviceConnectionPill } from '../components/DeviceConnectionPill'
+import { DeviceScanModal } from '../components/DeviceScanModal'
+import { DeviceFileDownload } from '../components/DeviceFileDownload'
+import type { DeviceBundle, DeviceScanResult } from '../types'
 
+// Core utilities
 import { logger } from '@/core/utils/logger'
 import { formatDistanceToNow } from '@/core/utils/time'
-
-// PUSH FINAL: Utilitaires temporaires
-const cn = (...args: any[]) => args.join(' ')
-
-// PUSH FINAL: Types temporaires avec any
-type DeviceBundle = any
-type DeviceScanResult = any
 
 // ==================== LOGGER SETUP ====================
 
@@ -88,6 +72,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   onNavigateToSite
 }) => {
   const { machine, site, installation, campaigns, calculations } = device
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // Statistiques rapides
   const connectedCampaigns = campaigns.filter(c => c.status === 'active').length
@@ -138,38 +123,61 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
               )}
             </div>
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => e.stopPropagation()}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(event) => {
+                event.stopPropagation()
+                setMenuOpen((prev) => !prev)
+              }}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+            {menuOpen && (
+              <div
+                className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10"
+                onClick={(event) => event.stopPropagation()}
               >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(device) }}>
-                <Edit3 className="w-4 h-4 mr-2" />
-                Modifier
-              </DropdownMenuItem>
-              {site && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onNavigateToSite(site.id) }}>
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Voir le site
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={(e) => { e.stopPropagation(); onDelete(device) }}
-                className="text-danger-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Supprimer
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onEdit(device)
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Modifier
+                </button>
+                {site && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onNavigateToSite(site.id)
+                    }}
+                    className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Voir le site
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onDelete(device)
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-sm text-danger-600 hover:bg-danger-50"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -570,7 +578,7 @@ export const DeviceListPage: React.FC = () => {
             : ''
         }
         confirmText="Supprimer"
-        confirmVariant="danger"
+        variant="danger"
       />
     </AppLayout>
   )

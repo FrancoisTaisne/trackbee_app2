@@ -14,7 +14,7 @@ import { databaseLog } from '@/core/utils/logger'
 
 // ==================== TRANSFER REPOSITORY ====================
 
-class TransferRepository extends BaseRepository<DatabaseTransferTask> {
+export class TransferRepository extends BaseRepository<DatabaseTransferTask> {
   constructor(db: TrackBeeDatabase) {
     super(db, db.transferTasks, 'transferTasks', {
       enableCache: true,
@@ -170,6 +170,11 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
     const timer = databaseLog.time('Mark transfer completed')
 
     try {
+      const task = await this.findById(taskId)
+      if (!task) {
+        throw new Error(`Transfer task ${taskId} not found`)
+      }
+
       const updates: Partial<DatabaseTransferTask> = {
         status: 'completed',
         endTime: new Date(),
@@ -182,11 +187,10 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
         }
       }
 
-      if (result && updates.files) {
-        updates.files = updates.files.map((file: any) => ({
+      if (task.files) {
+        updates.files = task.files.map(file => ({
           ...file,
-          transferred: true,
-          size: result.totalSize / result.filesTransferred // Moyenne
+          transferred: true
         }))
       }
 
@@ -220,7 +224,7 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
 
       const retryCount = (task.retryCount || 0) + (retryable ? 1 : 0)
 
-      const updates: any = {
+      const updates: Partial<DatabaseTransferTask> = {
         status: 'failed',
         endTime: new Date(),
         failureReason: error,
@@ -229,7 +233,7 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
 
       if (retryable) {
         updates.lastRetryAt = new Date()
-      } else if (task.lastRetryAt) {
+      } else if (task.lastRetryAt !== undefined) {
         updates.lastRetryAt = task.lastRetryAt
       }
 
@@ -263,7 +267,7 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
         throw new Error(`Cannot retry task with status: ${task.status}`)
       }
 
-      const updates: any = {
+      const updates: Partial<DatabaseTransferTask> = {
         status: 'pending',
         progress: {
           transferred: 0,
@@ -275,9 +279,6 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
       }
 
       // Supprimer les champs d'échec
-      delete updates.endTime
-      delete updates.failureReason
-
       await this.update(taskId, updates)
 
       timer.end({ success: true, taskId })
@@ -510,7 +511,7 @@ class TransferRepository extends BaseRepository<DatabaseTransferTask> {
 
 // ==================== FILE REPOSITORY ====================
 
-class FileRepository extends BaseRepository<DatabaseFile> {
+export class FileRepository extends BaseRepository<DatabaseFile> {
   constructor(db: TrackBeeDatabase) {
     super(db, db.files, 'files', {
       enableCache: true,
@@ -585,5 +586,3 @@ import { database } from '@/core/database/schema'
 
 export const transferRepository = new TransferRepository(database)
 export const fileRepository = new FileRepository(database)
-
-export type { TransferRepository, FileRepository }

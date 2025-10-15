@@ -14,14 +14,25 @@ export type CalculationId = number
 // Rôles utilisateur
 export type UserRole = 'ADMIN' | 'MODERATOR' | 'USER' | 'VIEWER'
 
-// États des campagnes
-export type CampaignStatus = 'draft' | 'active' | 'paused' | 'done' | 'canceled'
+// États des campagnes (compat: inclut anciens et nouveaux états)
+export type CampaignStatus =
+  | 'draft'
+  | 'active'
+  | 'paused'
+  | 'done'
+  | 'canceled'
+  | 'scheduled'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'error'
+  | 'cancelled'
 
 // Types de campagnes
 export type CampaignType = 'static_simple' | 'static_multiple' | 'kinematic' | 'rover_base'
 
-// États des calculs
-export type CalculationStatus = 'queued' | 'running' | 'done' | 'failed'
+// États des calculs (compat: inclut variantes)
+export type CalculationStatus = 'queued' | 'running' | 'done' | 'failed' | 'pending' | 'completed'
 
 // États de connexion BLE
 export type BleConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -59,13 +70,17 @@ export interface Machine {
   id: MachineId
   name: string             // Nom du device
   description?: string     // Description personnalisée
-  macAddress: string       // Adresse MAC device
+  macAddress?: string      // Adresse MAC device (alias frontend)
+  macD: string             // Adresse MAC device (nom backend)
   type?: 'trackbee' | 'trackbee_pro' | 'custom'
   model?: string          // Modèle du device
   firmwareVersion?: string
   batteryLevel?: number
   isActive: boolean       // Device actif/inactif
   installation?: Installation
+  lastSeen?: Date | string // Dernière connexion/détection
+  signalStrength?: number  // Force du signal (RSSI)
+  status?: 'active' | 'inactive' | 'maintenance' | 'error' // Statut opérationnel
   createdAt: string       // ISO string format
   updatedAt: string       // ISO string format
 }
@@ -103,6 +118,7 @@ export interface Installation {
     z?: number
     system: string
   }
+  isActive?: boolean      // Installation active/inactive
   site?: Site
   machine?: Machine
   createdAt: string       // ISO string format
@@ -123,12 +139,12 @@ export interface Campaign {
   period_s?: number
   priority?: number        // Priorité d'exécution (1-10, défaut 5)
   tags?: string[]         // Tags pour organisation
-  scheduledAt?: Date
-  startedAt?: Date
-  completedAt?: Date
+  scheduledAt?: Date | string
+  startedAt?: Date | string
+  completedAt?: Date | string
   rrule?: string           // RFC5545 pour récurrence
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 // Calcul post-traitement
@@ -148,11 +164,11 @@ export interface Calculation {
     precision?: number
     coordinateSystem?: string
   }
-  processingStartedAt?: Date
-  processingCompletedAt?: Date
+  processingStartedAt?: Date | string
+  processingCompletedAt?: Date | string
   errorMessage?: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 // Position géographique
@@ -196,8 +212,27 @@ export interface BleDeviceConnection {
 }
 
 // Progression de transfert
+export type TransferPhase =
+  | 'initializing'
+  | 'ble_probe'
+  | 'ble_disconnect'
+  | 'wifi_connect'
+  | 'wifi_transfer'
+  | 'wifi_disconnect'
+  | 'storage_save'
+  | 'upload_queue'
+  | 'ble_reconnect'
+  | 'cleanup'
+  | 'completed'
+  | 'failed'
+  | 'probe'
+  | 'downloading'
+  | 'storing'
+  | 'uploading'
+  | 'done'
+
 export interface TransferProgress {
-  phase: 'probe' | 'ble_disconnect' | 'wifi_connect' | 'downloading' | 'storing' | 'uploading' | 'cleanup' | 'ble_reconnect' | 'done'
+  phase: TransferPhase
   machineId: MachineId
   campaignId: CampaignId
   method: 'ble' | 'wifi' | 'auto'

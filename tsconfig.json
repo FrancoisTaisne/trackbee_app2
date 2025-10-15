@@ -30,8 +30,15 @@
       "@/app/*": ["src/app/*"],
       "@/features/*": ["src/features/*"],
       "@/shared/*": ["src/shared/*"],
-      "@/core/*": ["src/core/*"]
-    }
+      "@/core/*": ["src/core/*"],
+
+    },
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/scripts",
+    "src/core/services/hydration",
+    "src/core/services/data"
+  ]
 }

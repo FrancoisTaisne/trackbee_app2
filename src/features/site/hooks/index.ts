@@ -6,6 +6,7 @@
 export { useSite, siteQueryKeys } from './useSite'
 export { useSiteList } from './useSiteList'
 export { useSiteMap } from './useSiteMap'
+export { useGeocoding, useAddressLookup } from './useGeocoding'
 
 // Re-export types for convenience
 export type {
@@ -13,3 +14,7 @@ export type {
   UseSiteListReturn,
   UseSiteMapReturn
 } from '../types'
+export type {
+  UseGeocodingReturn,
+  UseAddressLookupReturn
+} from './useGeocoding'

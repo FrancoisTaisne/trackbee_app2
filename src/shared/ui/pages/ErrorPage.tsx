@@ -15,6 +15,14 @@ export function ErrorPage() {
   // Récupérer l'erreur depuis le state ou utiliser une erreur par défaut
   const error = location.state?.error || new Error('Une erreur inattendue s\'est produite')
 
+  const handleReload = React.useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.location.reload()
+    } else {
+      navigate(0)
+    }
+  }, [navigate])
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full text-center">
@@ -32,7 +40,7 @@ export function ErrorPage() {
 
         <div className="space-y-3">
           <Button
-            onClick={() => window.location.reload()}
+            onClick={handleReload}
             variant="primary"
             fullWidth
           >

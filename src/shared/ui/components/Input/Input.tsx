@@ -10,54 +10,58 @@ import { cn } from '@/shared/utils/cn'
 // ==================== VARIANTS ====================
 
 const inputVariants = cva(
-  // Classes de base
+  // Classes de base - Style professionnel compact
   [
-    'flex w-full rounded-md border transition-colors duration-200',
-    'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+    'flex w-full rounded border transition-colors duration-150',
+    'file:border-0 file:bg-transparent file:text-xs file:font-medium',
     'placeholder:text-gray-400 dark:placeholder:text-gray-500',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2',
-    'disabled:cursor-not-allowed disabled:opacity-50'
+    'focus:outline-none focus:ring-1 focus:ring-offset-0',
+    'disabled:cursor-not-allowed disabled:opacity-40'
   ],
   {
     variants: {
       variant: {
-        // Input par défaut
+        // Input par défaut - bordure fine
         default: [
           'border-gray-300 bg-white text-gray-900',
+          'hover:border-gray-400',
           'focus:border-trackbee-500 focus:ring-trackbee-500',
-          'dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100',
+          'dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100',
+          'dark:hover:border-gray-600',
           'dark:focus:border-trackbee-400 dark:focus:ring-trackbee-400'
         ],
 
-        // Input avec erreur
+        // Input avec erreur - discret
         error: [
-          'border-danger-300 bg-white text-gray-900',
+          'border-danger-400 bg-white text-gray-900',
           'focus:border-danger-500 focus:ring-danger-500',
-          'dark:border-danger-600 dark:bg-gray-700 dark:text-gray-100',
+          'dark:border-danger-600 dark:bg-gray-900 dark:text-gray-100',
           'dark:focus:border-danger-400 dark:focus:ring-danger-400'
         ],
 
-        // Input avec succès
+        // Input avec succès - discret
         success: [
-          'border-success-300 bg-white text-gray-900',
+          'border-success-400 bg-white text-gray-900',
           'focus:border-success-500 focus:ring-success-500',
-          'dark:border-success-600 dark:bg-gray-700 dark:text-gray-100',
+          'dark:border-success-600 dark:bg-gray-900 dark:text-gray-100',
           'dark:focus:border-success-400 dark:focus:ring-success-400'
         ],
 
-        // Input ghost
+        // Input ghost - ultra léger
         ghost: [
           'border-transparent bg-gray-50 text-gray-900',
-          'focus:border-trackbee-500 focus:ring-trackbee-500 focus:bg-white',
+          'hover:bg-gray-100',
+          'focus:border-gray-300 focus:ring-gray-300 focus:bg-white',
           'dark:bg-gray-800 dark:text-gray-100',
-          'dark:focus:border-trackbee-400 dark:focus:ring-trackbee-400 dark:focus:bg-gray-700'
+          'dark:hover:bg-gray-700',
+          'dark:focus:border-gray-600 dark:focus:ring-gray-600 dark:focus:bg-gray-900'
         ]
       },
 
       size: {
-        sm: 'h-8 px-3 text-sm',
-        md: 'h-10 px-3 text-sm',
-        lg: 'h-12 px-4 text-base'
+        sm: 'h-7 px-2.5 text-xs',
+        md: 'h-8 px-3 text-sm',
+        lg: 'h-9 px-3.5 text-sm'
       }
     },
 
@@ -176,10 +180,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ) => {
     const [validationError, setValidationError] = useState<string | null>(null)
     const [isValidating, setIsValidating] = useState(false)
-    const validationTimeout = React.useRef<NodeJS.Timeout>()
+    const validationTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
     // Générer un ID unique si non fourni
-    const inputId = id || `input-${React.useId()}`
+    const generatedId = React.useId()
+    const inputId = id ?? `input-${generatedId}`
 
     // Déterminer l'état de l'input
     const currentError = error || validationError
@@ -192,6 +197,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         if (validationTimeout.current) {
           clearTimeout(validationTimeout.current)
+          validationTimeout.current = null
         }
 
         setIsValidating(true)
@@ -225,6 +231,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       return () => {
         if (validationTimeout.current) {
           clearTimeout(validationTimeout.current)
+          validationTimeout.current = null
         }
       }
     }, [])
@@ -252,7 +259,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
           >
             {label}
           </label>
@@ -316,16 +323,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
         {/* Message d'aide ou d'erreur */}
         {(helpText || currentError) && (
-          <div className="mt-2">
+          <div className="mt-1">
             {currentError ? (
-              <p className="text-sm text-danger-600 dark:text-danger-400 flex items-center">
-                <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <p className="text-xs text-danger-600 dark:text-danger-400 flex items-center">
+                <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {currentError}
               </p>
             ) : (
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {helpText}
               </p>
             )}

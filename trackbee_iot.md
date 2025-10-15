@@ -2,6 +2,7 @@
 
 ## 📋 Vue d'ensemble
 
+repertoire du projet :'C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\1.IOT\3.Code\trackbee_v7'
 TrackBee IoT est un système embarqué autonome basé sur **ESP32-C6** + **simpleRTK2B** pour la collecte précise de données GNSS/RTK. Le système combine communication BLE/WiFi pour une intégration flexible avec l'application mobile.
 
 **Status**: ✅ **OPÉRATIONNEL** - Firmware v6 analysé et documenté
@@ -296,35 +297,48 @@ I (8766) WORK_MGR: Recording started: job_123
 ### Device Détecté et Testé
 - **Device ID**: #05 (BLEConsole)
 - **MAC Address**: `54:32:04:01:41:e6`
-- **Nom BLE**: `TR5432040141e6`
-- **Services**: A001 + A100 accessibles
-- **Firmware**: TrackBee v6 confirmé
+- **Nom BLE**: `TRXXXXXXXXXXXX` (format actuel firmware v7)
+- **Services**: A001 + A100 accessibles ✅
+- **Firmware**: TrackBee v7 (ESP-IDF 5.x) ✅
+- **Test Date**: 2025-10-07
 
-### Commandes Testées
+### Commandes Testées (2025-10-07)
 - ✅ BLE discovery et connexion
-- ✅ Service A100 accessible
+- ✅ Service A100 accessible et fonctionnel
 - ✅ JSON parsing operational
-- ⏳ Tests réels commandes (via BLEConsole)
-- ⏳ WiFi SoftAP activation
-- ⏳ File transfer complet
+- ✅ Commande `list_jobs` testée et validée
+- ✅ Commande `get_files` testée et validée
+- ✅ Base64 chunking fonctionnel
+- ⏳ Commande `add_job` (à tester)
+- ⏳ Commande `del_job` (à tester)
+- ⏳ WiFi SoftAP activation (à tester)
+- ⏳ File transfer complet (à tester)
 
 ### Plan de Tests Complets
 ```bash
-# Phase 1: Communication BLE
-node trackbee-json-tester.cjs interactive
-# → Test toutes commandes JSON
+# Phase 1: Communication BLE ✅ COMPLETED (2025-10-07)
+python scriptClaude/ble_automated_test.py
+# → ✅ Device discovery validated
+# → ✅ Connection stable
+# → ✅ Commands list_jobs, get_files tested
+# → ✅ Base64 response decoding working
 
-# Phase 2: GNSS Recording
+# Phase 2: GNSS Recording ⏳ PENDING
 # → Activer job test 60s
 # → Vérifier création fichier .ubx
+python scriptClaude/ble_complete_test.py
+# → Test add_job command
 
-# Phase 3: File Transfer
+# Phase 3: File Transfer ⏳ PENDING
 # → BLE download petit fichier
 # → WiFi SoftAP gros fichier
 
-# Phase 4: Integration App
+# Phase 4: Integration App ⏳ PENDING
 # → Connect via React BLE API
 # → Full workflow campaign creation
+npm run dev
+# → Navigate to Devices page
+# → Test scan and connect
 ```
 
 ---

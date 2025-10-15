@@ -11,39 +11,113 @@ import { stateLog, logger } from '@/core/utils/logger'
 import { transferOrchestrator } from '@/core/orchestrator/TransferOrchestrator'
 import { storageManager } from '@/core/services/storage/StorageManager'
 
-// Helper: normalize any orchestrator task/operation to a TransferTask shape
-function toTransferTask(taskId: string, src: any, fallback: { machineId: string | number, campaignId: string | number, files?: FileMetadata[] } = { machineId: '', campaignId: '' }): TransferTask {
-  const now = new Date()
-  const created = src?.createdAt ? new Date(src.createdAt) : now
-  const start = src?.startTime ? new Date(src.startTime) : created
-  const end = src?.endTime ? new Date(src.endTime) : undefined
-  const progress: TransferProgress = {
-    transferred: Number(src?.progress?.transferred) || 0,
-    total: Number(src?.progress?.total) || 0,
-    percentage: Number(src?.progress?.percentage) || 0,
-    speed: Number(src?.progress?.speed) || 0,
-    estimatedTimeRemaining: Number(src?.progress?.estimatedTimeRemaining) || 0
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const parseDate = (value: unknown): Date | undefined => {
+  if (value instanceof Date) return value
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
   }
+  return undefined
+}
+
+const parseNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+  return fallback
+}
+
+type TransferFileInput = FileMetadata | {
+  name?: string
+  filename?: string
+  size?: number
+  transferred?: boolean
+  path?: string
+}
+
+const normalizeFiles = (
+  files: TransferFileInput[]
+): { name: string; size: number; transferred: boolean; path?: string }[] =>
+  files.map((file) => {
+    if (isRecord(file)) {
+      const name =
+        typeof file.name === 'string'
+          ? file.name
+          : typeof file.filename === 'string'
+            ? file.filename
+            : 'unknown-file'
+
+      return {
+        name,
+        size: parseNumber(file.size),
+        transferred: Boolean(file.transferred ?? false),
+        path: typeof file.path === 'string' ? file.path : undefined,
+      }
+    }
+
+    return {
+      name: String(file),
+      size: 0,
+      transferred: false,
+    }
+  })
+
+// Helper: normalize any orchestrator task/operation to a TransferTask shape
+function toTransferTask(
+  taskId: string,
+  src: unknown,
+  fallback: {
+    machineId: string | number
+    campaignId: string | number
+    files?: TransferFileInput[]
+  } = { machineId: '', campaignId: '' }
+): TransferTask {
+  const now = new Date()
+  const source = isRecord(src) ? src : {}
+  const progressSource = isRecord(source.progress) ? source.progress : {}
+  const filesSource: TransferFileInput[] = Array.isArray(source.files)
+    ? source.files as TransferFileInput[]
+    : Array.isArray(fallback.files)
+      ? fallback.files
+      : []
+
+  const created = parseDate(source.createdAt) ?? now
+  const start = parseDate(source.startTime) ?? created
+  const end = parseDate(source.endTime)
+
+  const progress: TransferProgress = {
+    transferred: parseNumber(progressSource.transferred),
+    total: parseNumber(progressSource.total),
+    percentage: parseNumber(progressSource.percentage),
+    speed: parseNumber(progressSource.speed),
+    estimatedTimeRemaining: parseNumber(progressSource.estimatedTimeRemaining),
+  }
+
+  const campaignId =
+    source.campaignId != null
+      ? String(source.campaignId)
+      : fallback.campaignId != null
+        ? String(fallback.campaignId)
+        : undefined
+
   return {
-    // Identifiants
-    id: (src?.id ?? taskId) as string,
-    machineId: String(src?.machineId ?? fallback.machineId),
-    campaignId: Number(src?.campaignId ?? fallback.campaignId),
-
-    // Métadonnées
-    type: (src?.type ?? 'download'),
-    status: (src?.status ?? 'pending'),
-    priority: (src?.priority ?? 'normal'),
-
-    // Temps
+    id: typeof source.id === 'string' ? source.id : taskId,
+    machineId: String(source.machineId ?? fallback.machineId ?? ''),
+    campaignId,
+    type: typeof source.type === 'string' ? source.type : 'download',
+    status: typeof source.status === 'string' ? source.status : 'pending',
+    priority: typeof source.priority === 'string' ? source.priority : 'normal',
     createdAt: created,
     updatedAt: now,
     startTime: start,
     endTime: end,
-
-    // I/O
     progress,
-    files: (src?.files ?? fallback.files ?? []) as FileMetadata[]
+    files: normalizeFiles(filesSource),
   } as TransferTask
 }
 
@@ -89,7 +163,7 @@ interface TransferActions {
   createTask: (params: {
     machineId: string
     campaignId: string
-    files: string[]
+    files: TransferFileInput[]
     context?: {
       siteId?: string
       installationId?: string
@@ -172,7 +246,15 @@ export const useTransferStore = create<TransferStore>()(
 
       // ==================== TASK MANAGEMENT ====================
 
-      createTask: async (params) => {
+      createTask: async (params: {
+        machineId: string
+        campaignId: string
+        files: TransferFileInput[]
+        context?: {
+          siteId?: string
+          installationId?: string
+        }
+      }): Promise<string> => {
         const timer = logger.time('transfer', 'Create task')
 
         try {
@@ -264,7 +346,7 @@ export const useTransferStore = create<TransferStore>()(
           const newTaskId = await get().createTask({
             machineId: failedTask.machineId,
             campaignId: failedTask.campaignId || '',
-            files: failedTask.files?.map(f => f.name) || [],
+            files: failedTask.files || [],
             context: failedTask.context
           })
 

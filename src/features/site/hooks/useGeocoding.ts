@@ -1,14 +1,13 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * useGeocoding Hook - Service de géocodage d'adresses
  * Conversion d'adresses en coordonnées géographiques
  */
 
 import { useCallback, useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
-import type { AppError } from '@/core/types/common'
+import { AppError } from '@/core/types/common'
 import type {
   GeocodeResult,
   GeocodeOptions,
@@ -48,13 +47,14 @@ const geocodeAddress = async (options: GeocodeOptions): Promise<GeocodeResult[]>
 
   try {
     const response = await httpClient.get<GeocodeResult[]>(`/api/geocode?${params}`)
+    const results = response.data ?? []
 
     geocodingLog.info('Address geocoded successfully', {
       address: options.address,
-      resultCount: response.length
+      resultCount: results.length
     })
 
-    return response
+    return results
   } catch (error) {
     geocodingLog.error('Geocoding failed', { address: options.address, error })
     throw new AppError('Impossible de géocoder cette adresse', 'GEOCODING_FAILED')
@@ -71,13 +71,14 @@ const reverseGeocode = async (position: MapPosition): Promise<GeocodeResult[]> =
     const response = await httpClient.get<GeocodeResult[]>(
       `/api/reverse-geocode?lat=${position.lat}&lng=${position.lng}`
     )
+    const results = response.data ?? []
 
     geocodingLog.info('Position reverse geocoded successfully', {
       position,
-      resultCount: response.length
+      resultCount: results.length
     })
 
-    return response
+    return results
   } catch (error) {
     geocodingLog.error('Reverse geocoding failed', { position, error })
     throw new AppError('Impossible de trouver l\'adresse de cette position', 'REVERSE_GEOCODING_FAILED')
@@ -185,7 +186,7 @@ export const useAddressLookup = (
   options?: Partial<GeocodeOptions>
 ): UseAddressLookupReturn => {
   const [suggestions, setSuggestions] = useState<GeocodeResult[]>([])
-  const [currentQuery, setCurrentQuery] = useState('')
+  const [_currentQuery, setCurrentQuery] = useState('')
 
   const { geocodeAddress, isGeocoding, error } = useGeocoding()
 
@@ -201,7 +202,7 @@ export const useAddressLookup = (
       const results = await geocodeAddress(query, options)
       // Limiter les suggestions pour l'UX
       setSuggestions(results.slice(0, 5))
-    } catch (error) {
+    } catch {
       setSuggestions([])
     }
   }, [geocodeAddress, options])

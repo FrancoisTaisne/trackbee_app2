@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Système de logging structuré avec debug conditionnel
  * Support variables VITE_DEBUG_* pour contrôle granulaire
@@ -18,6 +19,19 @@ interface DebugConfig {
   performance: boolean
   state: boolean
   orchestrator: boolean
+}
+
+type LogTimerHandle = {
+  end(extraData?: unknown): number
+}
+
+export interface ScopedLogger {
+  trace(message: string, data?: unknown): void
+  debug(message: string, data?: unknown): void
+  info(message: string, data?: unknown): void
+  warn(message: string, data?: unknown): void
+  error(message: string, data?: unknown): void
+  time(operation: string): LogTimerHandle
 }
 
 class Logger {
@@ -124,7 +138,7 @@ class Logger {
       this.error(scope, error.message, {
         name: error.name,
         stack: error.stack,
-        cause: (error as any).cause,
+        cause: (error as { cause?: unknown }).cause,
       })
     } else {
       this.error(scope, `[${error.code}] ${error.message}`, {
@@ -183,18 +197,15 @@ class Logger {
    * Créer un logger spécialisé pour un scope
    * PUSH FINAL: Méthode extend manquante utilisée partout
    */
-  extend(scope: LogScope): Logger {
-    // Retourne une copie avec scope prédéfini
-    const extendedLogger = Object.create(this)
-    extendedLogger._defaultScope = scope
-
-    // Override des méthodes pour utiliser le scope par défaut
-    extendedLogger.debug = (message: string, data?: unknown) => this.debug(scope, message, data)
-    extendedLogger.info = (message: string, data?: unknown) => this.info(scope, message, data)
-    extendedLogger.warn = (message: string, data?: unknown) => this.warn(scope, message, data)
-    extendedLogger.error = (message: string, data?: unknown) => this.error(scope, message, data)
-
-    return extendedLogger
+  extend(scope: LogScope): ScopedLogger {
+    return {
+      trace: (message: string, data?: unknown) => this.trace(scope, message, data),
+      debug: (message: string, data?: unknown) => this.debug(scope, message, data),
+      info: (message: string, data?: unknown) => this.info(scope, message, data),
+      warn: (message: string, data?: unknown) => this.warn(scope, message, data),
+      error: (message: string, data?: unknown) => this.error(scope, message, data),
+      time: (operation: string) => this.time(scope, operation),
+    }
   }
 
   /**
@@ -528,7 +539,7 @@ export const stateLog = {
   time: (operation: string) => {
     const startTime = Date.now()
     return {
-      end: (result?: { success?: boolean; error?: any }) => {
+      end: (result?: { success?: boolean; error?: unknown }) => {
         const duration = Date.now() - startTime
         const level = result?.error ? 'error' : 'info'
         const status = result?.error ? '❌' : '✅'

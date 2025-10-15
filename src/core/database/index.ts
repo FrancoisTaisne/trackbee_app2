@@ -68,6 +68,7 @@ export type {
  */
 import { databaseLog } from '@/core/utils/logger'
 import { database } from './schema'
+import type { DatabaseSystemEvent } from './schema'
 import { transferRepository, fileRepository } from './repositories/TransferRepository'
 import { machineRepository } from './repositories/MachineRepository'
 
@@ -137,7 +138,7 @@ class DatabaseManager {
       const eventsCleaned = await database.table('systemEvents')
         .where('timestamp')
         .below(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
-        .and((event: any) => event.processed === true)
+        .and((event: DatabaseSystemEvent) => event.processed === true)
         .delete()
 
       // Nettoyer les tâches de transfert terminées (> 14 jours)
@@ -173,7 +174,7 @@ class DatabaseManager {
       const isOpen = database.isOpen()
       const version = database.verno
 
-      const totalRecords = Object.values(stats.tables).reduce((sum, count) => sum + (count as number), 0)
+      const totalRecords = Object.values(stats.tables).reduce((sum, count) => sum + count, 0)
 
       timer.end({ success: true, totalRecords })
 
@@ -182,7 +183,7 @@ class DatabaseManager {
         version,
         tables: stats.tables,
         totalRecords,
-        unsyncedRecords: (stats.unsyncedCount as number) || 0,
+        unsyncedRecords: stats.unsyncedCount ?? 0,
         storageSize: stats.totalSize
       }
 
@@ -265,14 +266,14 @@ class DatabaseManager {
       exportDate: Date
       totalRecords: number
     }
-    data: Record<string, any[]>
+    data: Record<string, unknown[]>
   }> {
     const timer = databaseLog.time('Export all data')
 
     try {
       const stats = await this.getGlobalStats()
 
-      const data: Record<string, any[]> = {}
+      const data: Record<string, unknown[]> = {}
 
       // Exporter toutes les tables principales
       const tables = [

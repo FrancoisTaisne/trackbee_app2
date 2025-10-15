@@ -10,89 +10,89 @@ import { cn } from '@/shared/utils/cn'
 // ==================== VARIANTS ====================
 
 const cardVariants = cva(
-  // Classes de base
+  // Classes de base - Style professionnel compact
   [
-    'rounded-lg border transition-all duration-200',
-    'focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-trackbee-500'
+    'rounded border transition-colors duration-150',
+    'focus-within:ring-1 focus-within:ring-offset-0 focus-within:ring-trackbee-500'
   ],
   {
     variants: {
       variant: {
-        // Carte par défaut
+        // Carte par défaut - minimaliste
         default: [
-          'bg-white border-gray-200 shadow-sm',
-          'hover:shadow-md hover:border-gray-300',
-          'dark:bg-gray-800 dark:border-gray-700',
-          'dark:hover:border-gray-600'
+          'bg-white border-gray-200',
+          'hover:border-gray-300',
+          'dark:bg-gray-900 dark:border-gray-800',
+          'dark:hover:border-gray-700'
         ],
 
-        // Carte élevée
+        // Carte élevée - ombre légère
         elevated: [
-          'bg-white border-gray-200 shadow-md',
-          'hover:shadow-lg hover:border-gray-300',
-          'dark:bg-gray-800 dark:border-gray-700',
-          'dark:hover:border-gray-600'
+          'bg-white border-gray-200 shadow-sm',
+          'hover:border-gray-300',
+          'dark:bg-gray-900 dark:border-gray-800',
+          'dark:hover:border-gray-700'
         ],
 
-        // Carte outline
+        // Carte outline - bordure simple
         outline: [
           'bg-transparent border-gray-300',
-          'hover:bg-gray-50 hover:border-gray-400',
-          'dark:border-gray-600 dark:hover:bg-gray-800/50',
-          'dark:hover:border-gray-500'
-        ],
-
-        // Carte ghost
-        ghost: [
-          'bg-transparent border-transparent',
-          'hover:bg-gray-50 hover:border-gray-200',
-          'dark:hover:bg-gray-800/50 dark:hover:border-gray-700'
-        ],
-
-        // Carte interactive (cliquable)
-        interactive: [
-          'bg-white border-gray-200 shadow-sm cursor-pointer',
-          'hover:shadow-md hover:border-gray-300 hover:scale-[1.02]',
-          'active:scale-[0.98] active:shadow-sm',
-          'dark:bg-gray-800 dark:border-gray-700',
+          'hover:bg-gray-50/50 hover:border-gray-400',
+          'dark:border-gray-700 dark:hover:bg-gray-900/50',
           'dark:hover:border-gray-600'
         ],
 
-        // Carte de statut
+        // Carte ghost - ultra discrète
+        ghost: [
+          'bg-transparent border-transparent',
+          'hover:bg-gray-50/50',
+          'dark:hover:bg-gray-900/50'
+        ],
+
+        // Carte interactive - subtile
+        interactive: [
+          'bg-white border-gray-200 cursor-pointer',
+          'hover:border-gray-400 hover:bg-gray-50/30',
+          'active:bg-gray-100/50',
+          'dark:bg-gray-900 dark:border-gray-800',
+          'dark:hover:border-gray-600 dark:hover:bg-gray-800/50'
+        ],
+
+        // Carte de statut - bordures colorées discrètes
         success: [
-          'bg-success-50 border-success-200',
-          'dark:bg-success-900/20 dark:border-success-800'
+          'bg-white border-l-2 border-success-500 border-y border-r border-gray-200',
+          'dark:bg-gray-900 dark:border-y-gray-800 dark:border-r-gray-800'
         ],
 
         warning: [
-          'bg-warning-50 border-warning-200',
-          'dark:bg-warning-900/20 dark:border-warning-800'
+          'bg-white border-l-2 border-warning-500 border-y border-r border-gray-200',
+          'dark:bg-gray-900 dark:border-y-gray-800 dark:border-r-gray-800'
         ],
 
         danger: [
-          'bg-danger-50 border-danger-200',
-          'dark:bg-danger-900/20 dark:border-danger-800'
+          'bg-white border-l-2 border-danger-500 border-y border-r border-gray-200',
+          'dark:bg-gray-900 dark:border-y-gray-800 dark:border-r-gray-800'
         ],
 
         info: [
-          'bg-blue-50 border-blue-200',
-          'dark:bg-blue-900/20 dark:border-blue-800'
+          'bg-white border-l-2 border-blue-500 border-y border-r border-gray-200',
+          'dark:bg-gray-900 dark:border-y-gray-800 dark:border-r-gray-800'
         ]
       },
 
       size: {
-        sm: 'p-3',
-        md: 'p-4',
-        lg: 'p-6',
-        xl: 'p-8'
+        sm: 'p-2',
+        md: 'p-3',
+        lg: 'p-4',
+        xl: 'p-6'
       },
 
       radius: {
         none: 'rounded-none',
         sm: 'rounded-sm',
-        md: 'rounded-md',
-        lg: 'rounded-lg',
-        xl: 'rounded-xl',
+        md: 'rounded',
+        lg: 'rounded-md',
+        xl: 'rounded-lg',
         full: 'rounded-full'
       }
     },
@@ -100,7 +100,7 @@ const cardVariants = cva(
     defaultVariants: {
       variant: 'default',
       size: 'md',
-      radius: 'lg'
+      radius: 'md'
     }
   }
 )
@@ -114,11 +114,6 @@ export interface CardProps
    * Contenu de la carte
    */
   children: React.ReactNode
-
-  /**
-   * Rendu en tant qu'élément différent
-   */
-  asChild?: boolean
 
   /**
    * Click handler pour les cartes interactives
@@ -146,7 +141,6 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       size,
       radius,
       children,
-      asChild = false,
       onCardClick,
       loading = false,
       disabled = false,
@@ -209,7 +203,7 @@ export const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(
   ({ className, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex flex-col space-y-1.5 pb-4', className)}
+      className={cn('flex flex-col space-y-1 pb-2', className)}
       {...props}
     >
       {children}
@@ -232,7 +226,7 @@ export const CardTitle = forwardRef<HTMLHeadingElement, CardTitleProps>(
     <Comp
       ref={ref}
       className={cn(
-        'text-lg font-semibold leading-none tracking-tight',
+        'text-sm font-semibold leading-tight',
         'text-gray-900 dark:text-gray-100',
         className
       )}
@@ -257,7 +251,7 @@ export const CardDescription = forwardRef<HTMLParagraphElement, CardDescriptionP
     <p
       ref={ref}
       className={cn(
-        'text-sm text-gray-600 dark:text-gray-400',
+        'text-xs text-gray-600 dark:text-gray-400',
         className
       )}
       {...props}
@@ -301,7 +295,7 @@ export const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(
   ({ className, children, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn('flex items-center pt-4', className)}
+      className={cn('flex items-center pt-2', className)}
       {...props}
     >
       {children}

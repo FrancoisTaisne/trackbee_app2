@@ -3,6 +3,8 @@
  * Point d'entrée centralisé pour tous les composants UI partagés
  */
 
+import type { ReactNode } from 'react'
+
 // ==================== COMPONENTS FONDAMENTAUX ====================
 
 // Button Components
@@ -126,7 +128,7 @@ export type SizeVariant = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
  */
 export interface BaseUIProps {
   className?: string
-  children?: React.ReactNode
+  children?: ReactNode
 }
 
 /**

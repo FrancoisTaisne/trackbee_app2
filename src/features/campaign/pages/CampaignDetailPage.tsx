@@ -1,43 +1,45 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
- * Campaign Detail Page
- * Page détaillée d'une campagne avec toutes ses informations
+ * Campaign Detail Page - nouvelle mise en page unifiée
  */
 
 import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
-import { PageLayout } from '@/shared/ui/components/Layout/PageLayout'
+import { ExternalLink, ArrowLeft } from 'lucide-react'
+import {
+  AppLayout,
+  PageHeader,
+  Section,
+  Button,
+  Breadcrumb
+} from '@/shared/ui/components'
 import { LoadingSpinner } from '@/shared/ui/components/Feedback/LoadingSpinner'
 import { ErrorMessage } from '@/shared/ui/components/Feedback/ErrorMessage'
 import { CampaignDetail } from '../components'
 import { useCampaign } from '../hooks'
 import type { Campaign } from '../types'
 
-export function CampaignDetailPage() {
+const buildBreadcrumb = (label: string) => (
+  <Breadcrumb
+    items={[
+      { label: 'Campagnes', href: '/campaigns' },
+      { label, current: true }
+    ]}
+  />
+)
+
+export function CampaignDetailPage(): JSX.Element {
   const { campaignId } = useParams<{ campaignId: string }>()
   const navigate = useNavigate()
 
-  const parsedCampaignId = campaignId ? parseInt(campaignId, 10) : 0
+  const parsedCampaignId = campaignId ? Number.parseInt(campaignId, 10) : Number.NaN
 
-  // Hook pour récupérer les informations de base de la campagne pour le breadcrumb
   const {
     campaign,
     isLoading: isLoadingCampaign,
     error: campaignError
-  } = useCampaign(parsedCampaignId)
+  } = useCampaign(Number.isNaN(parsedCampaignId) ? 0 : parsedCampaignId)
 
-  const handleCampaignUpdate = (updatedCampaign: Campaign) => {
-    // La mise à jour est gérée automatiquement par le cache TanStack Query
-    // On peut ajouter ici de la logique supplémentaire si nécessaire
-  }
-
-  const handleCampaignDelete = (campaignId: number) => {
-    // Rediriger vers la liste après suppression
-    navigate('/campaigns', { replace: true })
-  }
-
-  const handleBackToList = () => {
+  const handleNavigateBack = () => {
     navigate('/campaigns')
   }
 
@@ -53,114 +55,111 @@ export function CampaignDetailPage() {
     }
   }
 
-  // Gestion des erreurs de paramètres
-  if (!campaignId || isNaN(parsedCampaignId)) {
+  const handleCampaignUpdate = (_updatedCampaign: Campaign) => {
+    // Le cache TanStack Query broadcast déjà les changements
+  }
+
+  const handleCampaignDelete = (_deletedCampaignId: number) => {
+    navigate('/campaigns', { replace: true })
+  }
+
+  if (!campaignId || Number.isNaN(parsedCampaignId)) {
     return (
-      <PageLayout title="Erreur">
-        <ErrorMessage
-          title="Campagne non trouvée"
-          message="L'identifiant de la campagne est invalide."
-          onRetry={handleBackToList}
-          retryLabel="Retour à la liste"
+      <AppLayout title="Campagne introuvable">
+        <PageHeader
+          title="Campagne introuvable"
+          description="L'identifiant fourni ne correspond à aucune campagne."
+          breadcrumb={buildBreadcrumb('Erreur')}
+          actions={(
+            <Button variant="outline" onClick={handleNavigateBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour aux campagnes
+            </Button>
+          )}
         />
-      </PageLayout>
+
+        <Section>
+          <ErrorMessage message="Impossible de déterminer la campagne demandée." />
+        </Section>
+      </AppLayout>
     )
   }
 
-  // Loading state pour le titre de la page
   if (isLoadingCampaign) {
     return (
-      <PageLayout title="Chargement...">
-        <div className="flex justify-center py-12">
-          <LoadingSpinner size="large" />
-        </div>
-      </PageLayout>
+      <AppLayout title="Chargement de la campagne">
+        <PageHeader
+          title="Chargement de la campagne"
+          breadcrumb={buildBreadcrumb('Chargement')}
+        />
+        <Section>
+          <div className="flex justify-center py-12">
+            <LoadingSpinner size="lg" />
+          </div>
+        </Section>
+      </AppLayout>
     )
   }
 
-  // Error state
   if (campaignError) {
     return (
-      <PageLayout title="Erreur">
-        <ErrorMessage
-          title="Impossible de charger la campagne"
-          message={campaignError.message}
-          onRetry={() => window.location.reload()}
-          retryLabel="Réessayer"
+      <AppLayout title="Erreur lors du chargement">
+        <PageHeader
+          title="Erreur lors du chargement"
+          breadcrumb={buildBreadcrumb('Erreur')}
+          actions={(
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Réessayer
+            </Button>
+          )}
         />
-      </PageLayout>
+        <Section>
+          <ErrorMessage message={campaignError} />
+        </Section>
+      </AppLayout>
     )
   }
 
-  const pageTitle = campaign
-    ? campaign.name || `Campagne #${campaign.id}`
-    : 'Campagne'
+  const campaignTitle = campaign?.name || (campaign ? `Campagne #${campaign.id}` : 'Campagne')
 
   return (
-    <PageLayout
-      title={pageTitle}
-      subtitle={campaign?.description}
-      backButton={{
-        label: 'Retour aux campagnes',
-        onClick: handleBackToList
-      }}
-      actions={
-        campaign && (
+    <AppLayout title={campaignTitle}>
+      <PageHeader
+        title={campaignTitle}
+        description={campaign?.description}
+        breadcrumb={buildBreadcrumb(campaignTitle)}
+        actions={(
           <div className="flex items-center gap-3">
-            {/* Lien vers le site */}
-            {campaign.siteId && (
-              <button
-                onClick={handleNavigateToSite}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                <ExternalLink className="w-4 h-4" />
+            <Button variant="ghost" onClick={handleNavigateBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Retour
+            </Button>
+            {campaign?.siteId && (
+              <Button variant="outline" onClick={handleNavigateToSite}>
+                <ExternalLink className="w-4 h-4 mr-2" />
                 Voir le site
-              </button>
+              </Button>
             )}
-
-            {/* Lien vers le device */}
-            {campaign.machineId && (
-              <button
-                onClick={handleNavigateToDevice}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                <ExternalLink className="w-4 h-4" />
+            {campaign?.machineId && (
+              <Button variant="outline" onClick={handleNavigateToDevice}>
+                <ExternalLink className="w-4 h-4 mr-2" />
                 Voir le device
-              </button>
+              </Button>
             )}
           </div>
-        )
-      }
-    >
-      <div className="space-y-6">
-        {/* Navigation de contexte */}
-        {campaign && (
-          <nav className="flex items-center space-x-2 text-sm text-gray-500">
-            <button
-              onClick={handleBackToList}
-              className="hover:text-gray-700"
-            >
-              Campagnes
-            </button>
-            <span>/</span>
-            <span className="text-gray-900">
-              {campaign.name || `Campagne #${campaign.id}`}
-            </span>
-          </nav>
         )}
+      />
 
-        {/* Composant de détail de la campagne */}
+      <Section>
         <CampaignDetail
           campaignId={parsedCampaignId}
           onUpdate={handleCampaignUpdate}
           onDelete={handleCampaignDelete}
         />
-      </div>
-    </PageLayout>
+      </Section>
+    </AppLayout>
   )
 }
-
-// ==================== BREADCRUMB CONFIG ====================
 
 export const CampaignDetailPageBreadcrumb = {
   path: '/campaigns/:campaignId',
@@ -168,8 +167,6 @@ export const CampaignDetailPageBreadcrumb = {
   parent: '/campaigns',
   dynamic: true
 }
-
-// ==================== ROUTE CONFIG & EXPORT ====================
 
 export const CampaignDetailPageRoute = {
   path: '/campaigns/:campaignId',

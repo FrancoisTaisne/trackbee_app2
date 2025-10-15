@@ -1,14 +1,12 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
- * Offline Queue Hook
- * Hook pour la gestion de la queue offline des transferts
- */
-
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { logger } from '@/core/utils/logger'
 import type {
-  OfflineQueue, OfflineTransfer, TransferId, CreateTransferData, UseOfflineQueueReturn
+  OfflineQueue,
+  OfflineTransfer,
+  TransferId,
+  CreateTransferData,
+  UseOfflineQueueReturn
 } from '../types'
 import { transferQueryKeys } from '../types'
 
@@ -236,7 +234,7 @@ const DEFAULT_QUEUE: OfflineQueue = {
 
 export function useOfflineQueue(): UseOfflineQueueReturn {
   const queryClient = useQueryClient()
-  const storage = createStorage()
+  const storage = useMemo<OfflineStorage>(() => createStorage(), [])
 
   const [isSyncing, setIsSyncing] = useState(false)
   const [lastSync, setLastSync] = useState<Date | undefined>()
@@ -247,7 +245,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     isLoading: isLoadingQueue,
     error: queueError,
     refetch: refetchQueue
-  } = useQuery({
+  } = useQuery<OfflineQueue, Error>({
     queryKey: transferQueryKeys.offline(),
     queryFn: async () => {
       const existing = await storage.getQueue()
@@ -269,7 +267,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     isLoading: isLoadingTransfers,
     error: transfersError,
     refetch: refetchTransfers
-  } = useQuery({
+  } = useQuery<OfflineTransfer[], Error>({
     queryKey: [...transferQueryKeys.offline(), 'transfers'],
     queryFn: () => storage.getTransfers(),
     staleTime: 10 * 1000, // 10 secondes
@@ -278,7 +276,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
   })
 
   // Mutations
-  const addToQueueMutation = useMutation({
+  const addToQueueMutation = useMutation<void, Error, CreateTransferData>({
     mutationFn: async (transferData: CreateTransferData) => {
       const transfer: OfflineTransfer = {
         id: crypto.randomUUID(),
@@ -327,7 +325,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     }
   })
 
-  const removeFromQueueMutation = useMutation({
+  const removeFromQueueMutation = useMutation<void, Error, TransferId>({
     mutationFn: async (transferId: TransferId) => {
       await storage.removeTransfer(transferId)
 
@@ -355,7 +353,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     }
   })
 
-  const clearQueueMutation = useMutation({
+  const clearQueueMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
       await storage.clear()
 
@@ -386,7 +384,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     }
   })
 
-  const updateQueueSettingsMutation = useMutation({
+  const updateQueueSettingsMutation = useMutation<OfflineQueue, Error, Partial<OfflineQueue>>({
     mutationFn: async (settings: Partial<OfflineQueue>) => {
       if (!queue) throw new Error('Queue not initialized')
 
@@ -409,7 +407,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
   })
 
   // Synchronisation avec le serveur
-  const syncQueueMutation = useMutation({
+  const syncQueueMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
       if (!queue || !queue.isEnabled) {
         throw new Error('Queue disabled or not initialized')
@@ -568,13 +566,13 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
     }, 60 * 60 * 1000) // Toutes les heures
 
     return () => clearInterval(cleanupInterval)
-  }, [queue?.maxAge, refetchTransfers])
+  }, [queue?.maxAge, refetchTransfers, storage])
 
   const isLoading = isLoadingQueue || isLoadingTransfers
   const error = queueError || transfersError
 
   return {
-    queue,
+    queue: queue ?? null,
     queuedTransfers,
     isLoading,
     error,
@@ -598,7 +596,7 @@ export function useOfflineQueue(): UseOfflineQueueReturn {
 
 // ==================== SIMULATION ====================
 
-async function simulateSyncTransfer(transfer: OfflineTransfer): Promise<void> {
+async function simulateSyncTransfer(_transfer: OfflineTransfer): Promise<void> {
   // Simulation de l'API call - remplacer par la vraie implémentation
   return new Promise((resolve, reject) => {
     setTimeout(() => {

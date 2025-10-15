@@ -6,7 +6,6 @@
 import { stateLog } from '@/core/utils/logger'
 import { storageManager } from '@/core/services/storage/StorageManager'
 import { database } from '@/core/database/schema'
-import { AuthService } from '@/core/services/api/services/AuthService'
 
 export class AuthComprehensiveFix {
   /**
@@ -28,7 +27,7 @@ export class AuthComprehensiveFix {
       actions.push('Analyzed current auth state')
 
       // 2. Vérifier les données stockées
-      const storageData = await this.analyzeStorageData()
+      await this.analyzeStorageData()
       actions.push('Analyzed storage data')
 
       // 3. Forcer la re-synchronisation si nécessaire
@@ -212,10 +211,13 @@ export class AuthComprehensiveFix {
       }
 
       // Vérifier l'expiration de session
-      if (session && typeof session === 'object' && session.expiresAt) {
-        const expirationDate = new Date(session.expiresAt)
-        if (expirationDate.getTime() < Date.now()) {
-          issues.push('Session has expired')
+      if (session && typeof session === 'object' && 'expiresAt' in session) {
+        const expiration = (session as { expiresAt?: string | number | Date }).expiresAt
+        if (expiration) {
+          const expirationDate = new Date(expiration)
+          if (!Number.isNaN(expirationDate.getTime()) && expirationDate.getTime() < Date.now()) {
+            issues.push('Session has expired')
+          }
         }
       }
 
@@ -255,7 +257,9 @@ export class AuthComprehensiveFix {
         ...authKeys.map(key => {
           try {
             localStorage.removeItem(key)
-          } catch {}
+          } catch {
+            // Silently ignore
+          }
         })
       ])
 
@@ -265,8 +269,8 @@ export class AuthComprehensiveFix {
       authStore.cleanup()
 
       stateLog.info('✅ Corrupted data cleanup completed')
-    } catch (error) {
-      stateLog.error('❌ Cleanup failed', { error })
+    } catch {
+      // Silently ignore cleanup errors
     }
   }
 
@@ -275,7 +279,7 @@ export class AuthComprehensiveFix {
    */
   static async quickDiagnostic(): Promise<{
     summary: string
-    details: Record<string, any>
+    details: Record<string, unknown>
     recommendations: string[]
   }> {
     try {

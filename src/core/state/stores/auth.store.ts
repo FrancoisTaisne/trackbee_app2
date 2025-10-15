@@ -6,7 +6,7 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import type { User } from '@/features/auth/types'
+import type { User, RegisterData } from '@/features/auth/types'
 import { stateLog } from '@/core/utils/logger'
 import { storageManager } from '@/core/services/storage/StorageManager'
 import { httpClient } from '@/core/services/api/HttpClient'
@@ -54,7 +54,7 @@ interface AuthState {
 interface AuthActions {
   // Actions de session
   login: (credentials: { email: string; password: string }) => Promise<UserSession>
-  register: (data: any) => Promise<UserSession>
+  register: (data: RegisterData) => Promise<UserSession>
   logout: () => Promise<void>
   refreshToken: () => Promise<boolean>
 
@@ -161,8 +161,10 @@ export const useAuthStore = create<AuthStore>()(
             storageManager.set(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString())
           ])
 
-          // Configurer le token HTTP
-          await httpClient.setAuthToken(token, session.refreshToken, session.expiresAt.getTime())
+          // Configurer le token HTTP si présent (sinon session cookie-based)
+          if (token) {
+            await httpClient.setAuthToken(token, session.refreshToken, session.expiresAt.getTime())
+          }
 
           // Mettre à jour l'état
           set((state) => {
@@ -219,6 +221,13 @@ export const useAuthStore = create<AuthStore>()(
             })
           }
 
+          // Hydratation complète via l'API pour garantir les données à jour
+          try {
+            await get().hydrateUserData()
+          } catch (refreshError) {
+            stateLog.warn('⚠️ Hydration refresh after login failed', { refreshError })
+          }
+
           return session
 
         } catch (error) {
@@ -268,7 +277,7 @@ export const useAuthStore = create<AuthStore>()(
           // Store session data (with fallback for web)
           await Promise.all([
             storageManager.setWithFallback(STORAGE_KEYS.SESSION, session),
-            storageManager.setWithFallback(STORAGE_KEYS.TOKEN, token),
+            ...(token ? [storageManager.setWithFallback(STORAGE_KEYS.TOKEN, token)] : []),
             storageManager.set(STORAGE_KEYS.USER, user),
             storageManager.set(STORAGE_KEYS.LAST_ACTIVITY, new Date().toISOString())
           ])
@@ -331,14 +340,15 @@ export const useAuthStore = create<AuthStore>()(
             }
           }
 
-          // Nettoyer le storage (multi-backend pour robustesse)
+          // 1. Nettoyer le storage (multi-backend pour robustesse)
           const safeRemove = async (key: string) => {
             // Tenter sur plusieurs backends sans échouer globalement
             for (const type of ['secure', 'preferences', 'local'] as const) {
               try {
-                // @ts-expect-error: type is narrowed above
                 await storageManager.remove(key, { type })
-              } catch {}
+              } catch {
+                // Silently ignore
+              }
             }
           }
 
@@ -349,14 +359,45 @@ export const useAuthStore = create<AuthStore>()(
             safeRemove(STORAGE_KEYS.LAST_ACTIVITY)
           ])
 
-          // Nettoyer le client HTTP
+          // 2. Nettoyer TOUTES les clés localStorage
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              stateLog.debug('🧹 Cleaning localStorage...')
+              window.localStorage.clear()
+            }
+          } catch (error) {
+            stateLog.warn('localStorage clear failed', { error })
+          }
+
+          // 3. Nettoyer la base de données IndexedDB (TrackBeeDB)
+          try {
+            stateLog.debug('🗑️  Clearing IndexedDB tables...')
+            await Promise.all([
+              database.users.clear(),
+              database.machines.clear(),
+              database.sites.clear(),
+              database.installations.clear(),
+              database.campaigns.clear(),
+              database.calculations.clear(),
+              database.files.clear(),
+              database.transferTasks.clear(),
+              database.syncLogs.clear(),
+              database.systemEvents.clear(),
+              database.appState.clear()
+            ])
+            stateLog.info('✅ IndexedDB cleared')
+          } catch (error) {
+            stateLog.warn('IndexedDB clear failed', { error })
+          }
+
+          // 4. Nettoyer le client HTTP
           await httpClient.clearAuth()
 
-          // Reset de l'état
+          // 5. Reset de l'état
           set(() => ({ ...initialState, isInitialized: true }))
 
           timer.end({ success: true })
-          stateLog.info('✅ Logout completed')
+          stateLog.info('✅ Logout completed - All data cleared')
 
         } catch (error) {
           timer.end({ error })
@@ -452,7 +493,7 @@ export const useAuthStore = create<AuthStore>()(
         // Persister les changements
         const session = get().session
         if (session) {
-          storageManager.setWithFallback(STORAGE_KEYS.SESSION, session).catch((error: any) => {
+          storageManager.setWithFallback(STORAGE_KEYS.SESSION, session).catch((error: Error | unknown) => {
             stateLog.error('Failed to persist session update', { error })
           })
         }
@@ -517,7 +558,7 @@ export const useAuthStore = create<AuthStore>()(
                 isInitialized: true
               }))
 
-              timer.end({ success: true, cleaned: true })
+              timer.end({ success: true })
               return
             }
           }

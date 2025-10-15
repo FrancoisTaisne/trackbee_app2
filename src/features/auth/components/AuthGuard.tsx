@@ -96,9 +96,7 @@ const UnauthorizedFallback: React.FC<UnauthorizedFallbackProps> = ({
   </div>
 )
 
-interface LoadingFallbackProps {}
-
-const LoadingFallback: React.FC<LoadingFallbackProps> = () => (
+const LoadingFallback: React.FC<Record<string, never>> = () => (
   <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
     <Card className="max-w-md w-full text-center">
       <div className="p-6">
@@ -150,7 +148,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
 }) => {
   const { user, isAuthenticated, isLoading } = useAuth()
   const location = useLocation()
-  const [showLoginModal, setShowLoginModal] = React.useState(false)
+  const [_showLoginModal, setShowLoginModal] = React.useState(false)
 
   // Log guard access attempt
   React.useEffect(() => {
@@ -242,7 +240,7 @@ interface UseAuthGuardReturn {
 }
 
 export const useAuthGuard = (options: UseAuthGuardOptions = {}): UseAuthGuardReturn => {
-  const { requireRole, redirectTo } = options
+  const { requireRole, redirectTo: _redirectTo } = options
   const { user, isAuthenticated, isLoading } = useAuth()
   const location = useLocation()
 

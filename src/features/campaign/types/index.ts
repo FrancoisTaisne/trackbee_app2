@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Campaign Feature Types & Validation
  * Types stricts pour la gestion des campagnes de mesure GNSS
  */
@@ -6,45 +6,25 @@
 import { z } from 'zod'
 import type {
   CampaignId, SiteId, MachineId, InstallationId, CalculationId,
-  CampaignType, CampaignStatus, CalculationStatus
+  CampaignType, CampaignStatus, CalculationStatus,
+  Campaign, Calculation as DomainCalculation
 } from '@/core/types/domain'
+
+// Re-export Campaign and related IDs from domain for consistency
+export type { Campaign, CampaignId, CalculationId } from '@/core/types/domain'
 
 // ==================== BASE TYPES ====================
 
 export interface CampaignBundle {
   campaign: Campaign
-  calculations: Calculation[]
+  calculations: CampaignCalculation[]
   files: CampaignFile[]
   statistics: CampaignStatistics
 }
 
-export interface Campaign {
-  id: CampaignId
-  siteId: SiteId
-  machineId: MachineId
-  installationId?: InstallationId
-  name?: string
-  description?: string
-  type: CampaignType
-  status: CampaignStatus
 
-  // Configuration temporelle
-  duration_s?: number         // Durée en secondes pour static_simple
-  period_s?: number          // Période entre mesures pour static_multiple
-  scheduledAt?: string       // ISO string pour planification
-  startedAt?: string         // ISO string début effectif
-  completedAt?: string       // ISO string fin effective
-  rrule?: string            // RFC5545 pour récurrence (static_multiple)
 
-  // Métadonnées
-  priority?: number          // Priorité d'exécution (1-10, défaut 5)
-  tags?: string[]           // Tags pour organisation
-
-  createdAt: string         // ISO string
-  updatedAt: string         // ISO string
-}
-
-export interface Calculation {
+export interface CampaignCalculation extends Omit<DomainCalculation, "status"> {
   id: CalculationId
   campaignId: CampaignId
   siteId: SiteId
@@ -61,15 +41,15 @@ export interface Calculation {
   actual_start?: string     // ISO string
   actual_end?: string       // ISO string
 
-  // Résultats
+  // RÃ©sultats
   result_lat?: number
   result_lng?: number
   result_alt?: number
   accuracy_m?: number
   quality_score?: number
 
-  // Fichiers associés
-  input_files?: string[]    // Noms des fichiers d'entrée
+  // Fichiers associÃ©s
+  input_files?: string[]    // Noms des fichiers d'entrÃ©e
   output_files?: string[]   // Noms des fichiers de sortie
 
   createdAt: string
@@ -86,7 +66,7 @@ export interface CampaignFile {
   uploadedAt?: string       // ISO string
   processed: boolean
 
-  // Métadonnées extraites du nom
+  // MÃ©tadonnÃ©es extraites du nom
   recordedAt?: string       // ISO string extrait du nom
   deviceTimestamp?: string  // Timestamp original device
 }
@@ -98,10 +78,10 @@ export interface CampaignStatistics {
   failedCampaigns: number
   totalCalculations: number
   successfulCalculations: number
-  averageDuration: number   // Durée moyenne en secondes
+  averageDuration: number   // DurÃ©e moyenne en secondes
   totalFiles: number
-  totalDataSize: number     // Taille totale des données
-  lastActivity?: string     // ISO string de dernière activité
+  totalDataSize: number     // Taille totale des donnÃ©es
+  lastActivity?: string     // ISO string de derniÃ¨re activitÃ©
 }
 
 // ==================== SCHEDULING TYPES ====================
@@ -121,7 +101,7 @@ export interface RecurrenceOptions {
   weekdays?: number[]      // 0=dimanche, 1=lundi, etc.
   monthDays?: number[]     // Jours du mois (1-31)
   times: string[]          // Heures de mesure ["09:00", "12:00", "15:00"]
-  durationMin?: number     // Durée par occurrence en minutes
+  durationMin?: number     // DurÃ©e par occurrence en minutes
 }
 
 // ==================== FORM TYPES ====================
@@ -150,8 +130,8 @@ export interface UpdateCampaignData {
   priority?: number
   tags?: string[]
 
-  // Mise à jour planning
-  scheduledAt?: string
+  // Mise Ã  jour planning
+  scheduledAt?: string | Date
   rrule?: string
 }
 
@@ -178,7 +158,7 @@ export interface CampaignSorting {
 
 export interface UseCampaignReturn {
   campaign: Campaign | null
-  calculations: Calculation[]
+  calculations: CampaignCalculation[]
   files: CampaignFile[]
   statistics: CampaignStatistics | null
   isLoading: boolean
@@ -193,8 +173,8 @@ export interface UseCampaignReturn {
   cancelCampaign: () => Promise<void>
 
   // Calculs
-  createCalculation: (config?: any) => Promise<Calculation>
-  retryCalculation: (calculationId: CalculationId) => Promise<Calculation>
+  createCalculation: (config?: Record<string, unknown>) => Promise<CampaignCalculation>
+  retryCalculation: (calculationId: CalculationId) => Promise<CampaignCalculation>
 
   refetch: () => Promise<void>
 }
@@ -299,7 +279,19 @@ export interface CampaignStatsProps {
 // ==================== VALIDATION SCHEMAS ====================
 
 export const CampaignTypeSchema = z.enum(['static_simple', 'static_multiple', 'kinematic', 'rover_base'])
-export const CampaignStatusSchema = z.enum(['draft', 'active', 'paused', 'done', 'canceled'])
+export const CampaignStatusSchema = z.enum([
+  'draft',
+  'active',
+  'paused',
+  'done',
+  'canceled',
+  'cancelled',
+  'scheduled',
+  'running',
+  'completed',
+  'failed',
+  'error'
+])
 
 export const CreateCampaignSchema = z.object({
   siteId: z.number().int().positive('Site ID requis'),
@@ -310,7 +302,7 @@ export const CreateCampaignSchema = z.object({
   type: CampaignTypeSchema,
 
   // Configuration temporelle
-  duration_s: z.number().int().min(1, 'Durée minimale 1s').max(86400, 'Durée maximale 24h').optional(),
+  duration_s: z.number().int().min(1, 'DurÃ©e minimale 1s').max(86400, 'DurÃ©e maximale 24h').optional(),
   scheduledAt: z.string().datetime({ message: 'Date invalide' }).optional(),
   rrule: z.string().regex(/^FREQ=/, 'Format RRULE invalide').optional(),
 
@@ -356,48 +348,68 @@ export const RecurrenceOptionsSchema = z.object({
 export const CAMPAIGN_TYPES = {
   static_simple: {
     label: 'Statique Simple',
-    description: 'Mesure statique unique à durée définie',
+    description: 'Mesure statique unique Ã  durÃ©e dÃ©finie',
     icon: 'target',
     color: 'blue'
   },
   static_multiple: {
     label: 'Statique Multiple',
-    description: 'Mesures statiques récurrentes avec planification',
+    description: 'Mesures statiques rÃ©currentes avec planification',
     icon: 'calendar-repeat',
     color: 'green'
   },
   kinematic: {
-    label: 'Cinématique',
+    label: 'CinÃ©matique',
     description: 'Mesure en mouvement avec trajectoire',
     icon: 'route',
     color: 'orange'
   },
   rover_base: {
     label: 'Rover-Base',
-    description: 'Mesure différentielle avec station de base',
+    description: 'Mesure diffÃ©rentielle avec station de base',
     icon: 'radio',
     color: 'purple'
   }
 } as const
 
-export const CAMPAIGN_STATUS_LABELS = {
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
   draft: 'Brouillon',
   active: 'Active',
   paused: 'En pause',
   done: 'Terminée',
-  canceled: 'Annulée'
-} as const
+  canceled: 'Annulée',
+  cancelled: 'Annulée',
+  scheduled: 'Planifiée',
+  running: 'En cours',
+  completed: 'Terminée',
+  failed: 'Échec',
+  error: 'Erreur'
+}
+
+export const CAMPAIGN_STATUS_COLORS: Record<CampaignStatus, string> = {
+  draft: 'gray',
+  active: 'green',
+  paused: 'yellow',
+  done: 'green',
+  canceled: 'red',
+  cancelled: 'red',
+  scheduled: 'blue',
+  running: 'blue',
+  completed: 'green',
+  failed: 'red',
+  error: 'orange'
+}
 
 export const CAMPAIGN_PRIORITIES = {
-  1: { label: 'Très basse', color: 'gray' },
+  1: { label: 'TrÃ¨s basse', color: 'gray' },
   2: { label: 'Basse', color: 'gray' },
   3: { label: 'Basse', color: 'gray' },
   4: { label: 'Normale', color: 'blue' },
   5: { label: 'Normale', color: 'blue' },
   6: { label: 'Normale', color: 'blue' },
-  7: { label: 'Élevée', color: 'orange' },
-  8: { label: 'Élevée', color: 'orange' },
-  9: { label: 'Très élevée', color: 'red' },
+  7: { label: 'Ã‰levÃ©e', color: 'orange' },
+  8: { label: 'Ã‰levÃ©e', color: 'orange' },
+  9: { label: 'TrÃ¨s Ã©levÃ©e', color: 'red' },
   10: { label: 'Critique', color: 'red' }
 } as const
 
@@ -414,7 +426,7 @@ export interface CampaignError extends Error {
   code: 'CAMPAIGN_NOT_FOUND' | 'CAMPAIGN_RUNNING' | 'CAMPAIGN_INVALID_STATE' |
         'SCHEDULE_CONFLICT' | 'DEVICE_BUSY' | 'VALIDATION_ERROR'
   campaignId?: CampaignId
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 }
 
 // ==================== QUERY KEYS ====================
@@ -422,7 +434,7 @@ export interface CampaignError extends Error {
 export const campaignQueryKeys = {
   all: ['campaigns'] as const,
   lists: () => [...campaignQueryKeys.all, 'list'] as const,
-  list: (filters: CampaignFilters) => [...campaignQueryKeys.lists(), filters] as const,
+  list: (filters: Partial<CampaignFilters> = {}) => [...campaignQueryKeys.lists(), filters] as const,
   details: () => [...campaignQueryKeys.all, 'detail'] as const,
   detail: (id: CampaignId) => [...campaignQueryKeys.details(), id] as const,
   bundle: (id: CampaignId) => [...campaignQueryKeys.detail(id), 'bundle'] as const,
@@ -453,3 +465,4 @@ export function isCampaignType(value: string): value is CampaignType {
 export function isCampaignStatus(value: string): value is CampaignStatus {
   return ['draft', 'active', 'paused', 'done', 'canceled'].includes(value)
 }
+

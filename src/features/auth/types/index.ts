@@ -117,8 +117,8 @@ export interface LoginModalProps {
 }
 
 export interface AuthGuardProps {
-  children: React.ReactNode
-  fallback?: React.ReactNode
+  children: import('react').ReactNode
+  fallback?: import('react').ReactNode
   redirectTo?: string
   requireRole?: User['role']
 }

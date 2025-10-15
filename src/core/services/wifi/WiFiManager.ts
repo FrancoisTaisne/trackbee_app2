@@ -10,7 +10,7 @@ import type { SystemEvent, AppError, SoftApFileList } from '@/core/types/transpo
 import type { FileMeta } from '@/core/types/domain'
 import { wifiLog, logger } from '@/core/utils/logger'
 import { withTimeout, withRetry, sleep, formatTransferSpeed } from '@/core/utils/time'
-import { CONSTANTS, appConfig, detectPlatform } from '@/core/utils/env'
+import { appConfig, detectPlatform } from '@/core/utils/env'
 import { idUtils } from '@/core/utils/ids'
 import { SoftApFileListSchema, safeParseWithLog } from '@/core/types/transport'
 
@@ -54,6 +54,10 @@ interface SoftApTransferOptions {
   signal?: AbortSignal
   chunkSize?: number
   retryAttempts?: number
+}
+
+interface CapacitorWifiSsidResult {
+  ssid?: string
 }
 
 interface WiFiStats {
@@ -104,17 +108,16 @@ export class WiFiManager {
 
     try {
       const result = await withTimeout(
-        (CapacitorWifiConnect as any).scan(),
+        CapacitorWifiConnect.getSSIDs(),
         timeout,
         'WiFi scan timeout'
       )
 
-      const networks: WiFiNetwork[] = ((result as any).networks || []).map((network: any) => ({
-        ssid: network.ssid || '',
-        bssid: network.bssid,
-        security: network.security || 'UNKNOWN',
-        strength: network.level || network.rssi || 0,
-        frequency: network.frequency
+      const networks: WiFiNetwork[] = (result.value || []).map((ssid) => ({
+        ssid,
+        bssid: undefined,
+        security: 'UNKNOWN',
+        strength: 0
       }))
 
       wifiLog.info(`🔍 WiFi scan completed: ${networks.length} networks found`)
@@ -238,7 +241,6 @@ export class WiFiManager {
     const {
       onProgress,
       signal,
-      chunkSize = appConfig.performance.fileChunkSize,
       retryAttempts = 2
     } = options
 
@@ -255,7 +257,7 @@ export class WiFiManager {
 
     try {
       // 1. Connexion au SoftAP
-      const connectionInfo = await this.connect(credentials)
+      await this.connect(credentials)
 
       // 2. Attendre la stabilisation de la connexion
       await sleep(1000)
@@ -294,7 +296,7 @@ export class WiFiManager {
           size: file.size
         })
 
-        const fileContent = await this.downloadFile(
+        await this.downloadFile(
           credentials.serverUrl,
           file.name,
           {
@@ -374,7 +376,7 @@ export class WiFiManager {
 
     try {
       const ssidResult = await CapacitorWifiConnect.getDeviceSSID()
-      const ssid = typeof ssidResult === 'string' ? ssidResult : (ssidResult as any)?.ssid || null
+      const ssid = typeof ssidResult === 'string' ? ssidResult : (ssidResult as CapacitorWifiSsidResult)?.ssid || null
 
       if (!ssid) {
         return null
@@ -574,7 +576,7 @@ export class WiFiManager {
       {
         maxRetries: retryAttempts,
         delayMs: 1000,
-        onError: (error: any, attempt: any) => {
+        onError: (error: unknown, attempt: number) => {
           wifiLog.warn(`Download attempt ${attempt} failed, retrying...`, { filename, error })
         }
       }
@@ -597,7 +599,7 @@ export class WiFiManager {
     }
   }
 
-  private emitEvent(type: SystemEvent['type'], data: any): void {
+  private emitEvent(type: SystemEvent['type'], data: unknown): void {
     const event = { type, data } as SystemEvent
     this.eventListeners.forEach(listener => {
       try {

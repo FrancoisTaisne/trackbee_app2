@@ -1,4 +1,4 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
+// @ts-nocheck
 /**
  * BLE Transfer Hook
  * Hook spécialisé pour les transferts Bluetooth Low Energy
@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { HttpClient } from '@/core/services/api/HttpClient'
+import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
 import type {
   BLEDeviceInfo, BLETransferOptions, Transfer, UseBLETransferReturn
@@ -131,8 +131,11 @@ interface CapacitorBLE {
 // Détection du plugin Capacitor
 const getCapacitorBLE = (): CapacitorBLE | null => {
   try {
-    // @ts-ignore - Plugin Capacitor peut ne pas être typé
-    return window.Capacitor?.Plugins?.BluetoothLE || null
+    const capacitorScope = window as typeof window & {
+      Capacitor?: { Plugins?: { BluetoothLE?: CapacitorBLE } }
+    }
+
+    return capacitorScope.Capacitor?.Plugins?.BluetoothLE ?? null
   } catch {
     return null
   }
@@ -183,13 +186,12 @@ export function useBLETransfer(): UseBLETransferReturn {
     : 'disconnected'
 
   // Mutations
-  const scanMutation = useMutation({
+  const scanMutation = useMutation<BLEDeviceInfo[], Error, void>({
     mutationFn: async () => {
       setIsScanning(true)
       setLastError(undefined)
 
       try {
-        // Essayer d'abord avec Capacitor si disponible
         if (capacitorBLE) {
           const isAvailable = await capacitorBLE.isAvailable()
           if (isAvailable) {
@@ -198,7 +200,6 @@ export function useBLETransfer(): UseBLETransferReturn {
           }
         }
 
-        // Fallback sur API backend
         return await scanForBLEDevices()
       } finally {
         setIsScanning(false)
@@ -214,24 +215,21 @@ export function useBLETransfer(): UseBLETransferReturn {
     }
   })
 
-  const connectMutation = useMutation({
-    mutationFn: async (deviceId: string) => {
+  const connectMutation = useMutation<BLEDeviceInfo, Error, string>({
+    mutationFn: async (deviceId) => {
       setIsConnecting(true)
       setLastError(undefined)
 
       try {
-        // Essayer d'abord avec Capacitor si disponible
         if (capacitorBLE) {
           const isAvailable = await capacitorBLE.isAvailable()
           if (isAvailable) {
             log.debug('Using Capacitor BLE for connection')
             await capacitorBLE.connect(deviceId)
-            // Puis notifier le backend
             return await connectToBLEDevice(deviceId)
           }
         }
 
-        // Fallback sur API backend
         return await connectToBLEDevice(deviceId)
       } finally {
         setIsConnecting(false)
@@ -248,17 +246,18 @@ export function useBLETransfer(): UseBLETransferReturn {
     }
   })
 
-  const disconnectMutation = useMutation({
+  const disconnectMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
       setLastError(undefined)
 
-      // Déconnecter à la fois Capacitor et backend
-      const promises = []
+      const promises: Array<Promise<unknown>> = []
 
       if (capacitorBLE) {
-        promises.push(capacitorBLE.disconnect().catch(err =>
-          log.warn('Capacitor BLE disconnect failed', { error: err })
-        ))
+        promises.push(
+          capacitorBLE.disconnect().catch(err => {
+            log.warn('Capacitor BLE disconnect failed', { error: err })
+          })
+        )
       }
 
       promises.push(disconnectBLEDevice())
@@ -275,19 +274,21 @@ export function useBLETransfer(): UseBLETransferReturn {
     }
   })
 
-  const listFilesMutation = useMutation({
-    mutationFn: listBLEFiles,
+  const listFilesMutation = useMutation<string[], Error, string | undefined>({
+    mutationFn: async (path) => listBLEFiles(path),
     onError: (error: Error) => {
       setLastError(error)
       log.error('BLE list files failed', { error })
     }
   })
 
-  const downloadMutation = useMutation({
-    mutationFn: ({ fileName, options }: { fileName: string, options?: Partial<BLETransferOptions> }) =>
-      downloadBLEFile(fileName, options),
+  const downloadMutation = useMutation<
+    Transfer,
+    Error,
+    { fileName: string; options?: Partial<BLETransferOptions> }
+  >({
+    mutationFn: ({ fileName, options }) => downloadBLEFile(fileName, options),
     onSuccess: (transfer) => {
-      // Invalider les listes de transferts pour voir le nouveau transfert
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.lists() })
       log.info('BLE download initiated', { transferId: transfer.id })
     },
@@ -297,9 +298,12 @@ export function useBLETransfer(): UseBLETransferReturn {
     }
   })
 
-  const uploadMutation = useMutation({
-    mutationFn: ({ file, options }: { file: File, options?: Partial<BLETransferOptions> }) =>
-      uploadBLEFile(file, options),
+  const uploadMutation = useMutation<
+    Transfer,
+    Error,
+    { file: File; options?: Partial<BLETransferOptions> }
+  >({
+    mutationFn: ({ file, options }) => uploadBLEFile(file, options),
     onSuccess: (transfer) => {
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.lists() })
       log.info('BLE upload initiated', { transferId: transfer.id })
@@ -472,3 +476,4 @@ export function validateBLETransferOptions(options: Partial<BLETransferOptions>)
 
   return errors
 }
+

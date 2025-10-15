@@ -211,7 +211,7 @@ const UserMenuDropdown: React.FC<UserMenuDropdownProps> = ({
 
           {user.role === 'admin' && (
             <button
-              onClick={() => handleAction(() => console.log('Admin panel'))}
+              onClick={() => handleAction(() => userMenuLog.info('Admin panel shortcut clicked'))}
               className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <Shield className="w-4 h-4" />

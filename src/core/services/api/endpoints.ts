@@ -14,11 +14,11 @@ export const API_BASE_URL = '/api'
 export const AUTH_ENDPOINTS = {
   // Authentification utilisateur
   register: '/api/auth/register',
-  login: (apiRoute: string) => apiRoute, // Utilise USER_API_SIGNIN depuis env
+  login: '/api/auth/signin',  // Route correcte du backend
   logout: '/api/auth/logout',
 
   // Authentification machine
-  machineLogin: (apiRoute: string) => apiRoute, // Utilise MACHINE_API_SIGNIN depuis env
+  machineLogin: '/api/machine/signin',  // Route correcte du backend
 
   // Vérification email
   verifyEmail: '/verify-email',

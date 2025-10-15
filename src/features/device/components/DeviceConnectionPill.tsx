@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback } from 'react'
-import { Bluetooth, BluetoothConnected, Loader2, AlertCircle, Power } from 'lucide-react'
+import { Bluetooth, BluetoothConnected, Loader2, AlertCircle } from 'lucide-react'
 import { Button, Badge } from '@/shared/ui/components'
 import { useDevice } from '../hooks/useDevice'
 import { logger } from '@/core/utils/logger'
@@ -109,9 +109,13 @@ const getConnectionConfig = (
   }
 }
 
+// ==================== HELPERS ====================
+
+const isValidDeviceId = (deviceId: number): boolean => Number.isInteger(deviceId) && deviceId > 0
+
 // ==================== MAIN COMPONENT ====================
 
-export const DeviceConnectionPill: React.FC<DeviceConnectionPillProps> = ({
+const DeviceConnectionPillInner: React.FC<DeviceConnectionPillProps> = ({
   deviceId,
   showLabel = true,
   size = 'md',
@@ -120,8 +124,7 @@ export const DeviceConnectionPill: React.FC<DeviceConnectionPillProps> = ({
   const {
     device,
     connectDevice,
-    disconnectDevice,
-    error: deviceError
+    disconnectDevice
   } = useDevice(deviceId)
 
   // Récupérer l'état de connexion depuis le hook
@@ -242,6 +245,23 @@ export const DeviceConnectionPill: React.FC<DeviceConnectionPillProps> = ({
       )}
     </Badge>
   )
+}
+
+export const DeviceConnectionPill: React.FC<DeviceConnectionPillProps> = (props) => {
+  if (!isValidDeviceId(props.deviceId)) {
+    connectionLog.warn('DeviceConnectionPill skipped rendering for invalid device id', {
+      deviceId: props.deviceId
+    })
+
+    return (
+      <Badge variant="secondary" className="flex items-center space-x-1.5">
+        <AlertCircle className="w-3 h-3" />
+        {props.showLabel !== false && <span>Non disponible</span>}
+      </Badge>
+    )
+  }
+
+  return <DeviceConnectionPillInner {...props} />
 }
 
 // ==================== DISPLAY NAME ====================

@@ -49,7 +49,7 @@ export const AppLayoutWrapper: React.FC<AppLayoutWrapperProps> = ({
       <LoginModal
         isOpen={showLoginModal}
         onClose={handleCloseLogin}
-        onSuccess={handleLoginSuccess}
+        onLoginSuccess={handleLoginSuccess}
       />
     </>
   )

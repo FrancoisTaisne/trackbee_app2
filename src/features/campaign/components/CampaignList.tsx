@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Campaign List Component
  * Liste des campagnes avec filtres, tri et actions
@@ -6,36 +5,44 @@
 
 import React, { useState } from 'react'
 import {
-  Search, Filter, Plus, MoreVertical, Play, Pause, Square,
-  Edit, Copy, Trash2, Calendar, Clock, Target, Route, Radio, Repeat,
-  ChevronDown, ChevronRight
+  Search, Filter, Plus, MoreVertical,
+  Copy, Trash2, Clock, Target, Route, Radio, Repeat
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { logger } from '@/core/utils/logger'
 import { useCampaignList } from '../hooks'
 import { CampaignForm } from './CampaignForm'
 import type {
   CampaignListProps, CampaignFilters, CampaignSorting, CreateCampaignData
 } from '../types'
-import type { Campaign } from '@/core/types/domain'
+import type { Campaign, CampaignStatus, CampaignType } from '@/core/types/domain'
 import {
-  CAMPAIGN_TYPES, CAMPAIGN_STATUS_LABELS, CAMPAIGN_PRIORITIES
+  CAMPAIGN_TYPES, CAMPAIGN_STATUS_LABELS, CAMPAIGN_PRIORITIES, CAMPAIGN_STATUS_COLORS
 } from '../types'
 
-const log = logger
+const log = logger.extend('campaign')
 
-const CAMPAIGN_TYPE_ICONS = {
+const CAMPAIGN_TYPE_ICONS: Record<keyof typeof CAMPAIGN_TYPES, LucideIcon> = {
   static_simple: Target,
   static_multiple: Repeat,
   kinematic: Route,
   rover_base: Radio
 }
 
-const STATUS_COLORS = {
-  draft: 'gray',
-  active: 'green',
-  paused: 'yellow',
-  done: 'blue',
-  canceled: 'red'
+const STATUS_COLORS = CAMPAIGN_STATUS_COLORS
+
+type CampaignPriorityKey = keyof typeof CAMPAIGN_PRIORITIES
+
+const hasOwn = <T extends object>(obj: T, key: PropertyKey): key is keyof T => (
+  Object.prototype.hasOwnProperty.call(obj, key)
+)
+
+const toCampaignType = (value: string): CampaignType | undefined =>
+  value && hasOwn(CAMPAIGN_TYPES, value) ? value as CampaignType : undefined
+
+const toPriorityKey = (value: number | undefined): CampaignPriorityKey => {
+  const candidate = value ?? 5
+  return hasOwn(CAMPAIGN_PRIORITIES, candidate) ? candidate : 5
 }
 
 export function CampaignList({
@@ -335,9 +342,13 @@ interface CampaignRowProps {
 function CampaignRow({ campaign, isSelected, onSelect, onAction }: CampaignRowProps) {
   const [showActions, setShowActions] = useState(false)
 
-  const TypeIcon = CAMPAIGN_TYPE_ICONS[campaign.type]
-  const statusColor = STATUS_COLORS[campaign.status]
-  const priorityConfig = CAMPAIGN_PRIORITIES[campaign.priority || 5]
+  const typeKey = toCampaignType(campaign.type) ?? 'static_simple'
+  const typeConfig = CAMPAIGN_TYPES[typeKey]
+  const TypeIcon = CAMPAIGN_TYPE_ICONS[typeKey] ?? Target
+  const statusColor = STATUS_COLORS[campaign.status] ?? 'gray'
+  const statusLabel = CAMPAIGN_STATUS_LABELS[campaign.status] ?? campaign.status
+  const priorityKey = toPriorityKey(campaign.priority)
+  const priorityConfig = CAMPAIGN_PRIORITIES[priorityKey]
 
   return (
     <div className={`flex items-center px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 ${
@@ -354,8 +365,8 @@ function CampaignRow({ campaign, isSelected, onSelect, onAction }: CampaignRowPr
 
       <div className="flex-1 cursor-pointer" onClick={() => onAction('select')}>
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg bg-${CAMPAIGN_TYPES[campaign.type].color}-100`}>
-            <TypeIcon className={`w-4 h-4 text-${CAMPAIGN_TYPES[campaign.type].color}-600`} />
+          <div className={`p-2 rounded-lg bg-${typeConfig.color}-100`}>
+            <TypeIcon className={`w-4 h-4 text-${typeConfig.color}-600`} />
           </div>
           <div>
             <h4 className="font-medium text-gray-900">
@@ -370,19 +381,19 @@ function CampaignRow({ campaign, isSelected, onSelect, onAction }: CampaignRowPr
 
       <div className="w-32">
         <span className="text-sm font-medium text-gray-700">
-          {CAMPAIGN_TYPES[campaign.type].label}
+          {typeConfig.label}
         </span>
       </div>
 
       <div className="w-24">
         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-800`}>
-          {CAMPAIGN_STATUS_LABELS[campaign.status]}
+          {statusLabel}
         </span>
       </div>
 
       <div className="w-24">
         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${priorityConfig.color}-100 text-${priorityConfig.color}-800`}>
-          {campaign.priority || 5}
+          {priorityConfig.label}
         </span>
       </div>
 
@@ -464,7 +475,10 @@ function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: Fil
           </label>
           <select
             value={filters.type || ''}
-            onChange={(e) => onFiltersChange({ type: e.target.value || undefined })}
+            onChange={(e) => {
+              const nextType = e.target.value
+              onFiltersChange({ type: nextType ? toCampaignType(nextType) : undefined })
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Tous les types</option>
@@ -481,9 +495,12 @@ function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: Fil
           </label>
           <select
             value={filters.status?.[0] || ''}
-            onChange={(e) => onFiltersChange({
-              status: e.target.value ? [e.target.value as any] : undefined
-            })}
+            onChange={(e) => {
+              const selectedStatus = e.target.value as CampaignStatus | ''
+              onFiltersChange({
+                status: selectedStatus ? [selectedStatus] : undefined
+              })
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Tous les statuts</option>
@@ -501,8 +518,11 @@ function FilterPanel({ filters, onFiltersChange, sorting, onSortingChange }: Fil
           <select
             value={`${sorting.field}-${sorting.direction}`}
             onChange={(e) => {
-              const [field, direction] = e.target.value.split('-')
-              onSortingChange({ field: field as any, direction: direction as any })
+              const [field, direction] = e.target.value.split('-') as [
+                CampaignSorting['field'],
+                CampaignSorting['direction']
+              ]
+              onSortingChange({ field, direction })
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >

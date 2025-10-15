@@ -1,16 +1,15 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Campaign Form Component
  * Formulaire complet de création/édition de campagnes GNSS
  */
 
 import React, { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
-  Play, Calendar, Clock, Repeat, Target, Route, Radio, Tag,
-  AlertCircle, Info, ChevronDown, ChevronRight
+  Play, Calendar, Clock, Repeat, Target, Route, Radio,
+  Info, ChevronDown, ChevronRight
 } from 'lucide-react'
 import { logger } from '@/core/utils/logger'
 import type {
@@ -22,7 +21,7 @@ import {
   CAMPAIGN_TYPES, DEFAULT_DURATIONS
 } from '../types'
 
-const log = logger
+const log = logger.extend('campaign')
 
 interface FormData extends CreateCampaignData {
   scheduleType: 'immediate' | 'scheduled' | 'recurring'
@@ -56,8 +55,7 @@ export function CampaignForm({
     watch,
     setValue,
     getValues,
-    control,
-    formState: { errors, isDirty, isValid, isSubmitting }
+    formState: { errors, isValid, isSubmitting }
   } = useForm<FormData>({
     resolver: zodResolver(CreateCampaignSchema.extend({
       scheduleType: z.enum(['immediate', 'scheduled', 'recurring']),
@@ -85,9 +83,18 @@ export function CampaignForm({
 
   // Mise à jour des durées suggérées selon le type
   useEffect(() => {
-    if (watchType && !getValues('duration_s')) {
-      const defaultDuration = DEFAULT_DURATIONS[watchType][0]
-      setValue('duration_s', defaultDuration)
+    if (!watchType) {
+      return
+    }
+
+    const durations = DEFAULT_DURATIONS[watchType]
+
+    if (!durations) {
+      return
+    }
+
+    if (!getValues('duration_s')) {
+      setValue('duration_s', durations[0])
     }
   }, [watchType, setValue, getValues])
 
@@ -494,13 +501,15 @@ function buildRRuleFromRecurrence(recurrence: RecurrenceOptions): string {
 // ==================== RECURRENCE SUB-COMPONENT ====================
 
 interface RecurrenceConfigurationProps {
-  register: any
-  errors: any
+  register: UseFormRegister<FormData>
+  errors: FieldErrors<FormData>
   isOpen: boolean
   onToggle: () => void
 }
 
 function RecurrenceConfiguration({ register, errors, isOpen, onToggle }: RecurrenceConfigurationProps) {
+  const recurrenceErrors = errors.recurrence as FieldErrors<NonNullable<FormData['recurrence']>> | undefined
+
   return (
     <div className="border border-purple-200 rounded-lg">
       <button
@@ -563,8 +572,8 @@ function RecurrenceConfiguration({ register, errors, isOpen, onToggle }: Recurre
                 </label>
               ))}
             </div>
-            {errors.recurrence?.times && (
-              <p className="mt-1 text-sm text-red-600">{errors.recurrence.times.message}</p>
+            {recurrenceErrors?.times && (
+              <p className="mt-1 text-sm text-red-600">{recurrenceErrors.times?.message}</p>
             )}
           </div>
 
@@ -586,3 +595,4 @@ function RecurrenceConfiguration({ register, errors, isOpen, onToggle }: Recurre
     </div>
   )
 }
+

@@ -4,7 +4,7 @@
  */
 
 // Import des services traditionnels
-import AuthService from './AuthService'
+import { AuthService } from './AuthService'
 import MachineService from './MachineService'
 import SiteService from './SiteService'
 
@@ -14,7 +14,6 @@ import { openApiDiscovery } from '../OpenApiDiscovery'
 
 // Import des types
 export type {
-  LoginResponse,
   RegisterResponse,
   RefreshResponse,
   MachineLoginCredentials,

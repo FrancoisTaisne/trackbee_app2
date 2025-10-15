@@ -161,7 +161,7 @@ export interface DatabaseSystemEvent {
 
   // Propriétés de SystemEvent
   type: string
-  data: Record<string, any>
+  data: Record<string, unknown>
 
   // Propriétés spécifiques à la DB
   persisted: boolean
@@ -175,7 +175,7 @@ export interface DatabaseSystemEvent {
 
 export interface DatabaseAppState {
   key: string
-  value: any
+  value: unknown
   updatedAt: Date
   expiresAt?: Date
 
@@ -187,14 +187,14 @@ export interface DatabaseAppState {
 // ==================== DATABASE CLASS ====================
 
 export class TrackBeeDatabase extends Dexie {
-  // Tables principales
-  users!: Table<DatabaseUser, string>
-  machines!: Table<DatabaseMachine, string>
-  sites!: Table<DatabaseSite, string>
-  installations!: Table<DatabaseInstallation, string>
-  campaigns!: Table<DatabaseCampaign, string>
-  calculations!: Table<DatabaseCalculation, string>
-  files!: Table<DatabaseFile, string>
+  // Tables principales (IDs numériques, alignés avec le domaine)
+  users!: Table<DatabaseUser, number>
+  machines!: Table<DatabaseMachine, number>
+  sites!: Table<DatabaseSite, number>
+  installations!: Table<DatabaseInstallation, number>
+  campaigns!: Table<DatabaseCampaign, number>
+  calculations!: Table<DatabaseCalculation, number>
+  files!: Table<DatabaseFile, string>  // fichiers: id string (hash/uuid)
 
   // Tables système
   transferTasks!: Table<DatabaseTransferTask, string>
@@ -312,9 +312,11 @@ export class TrackBeeDatabase extends Dexie {
   /**
    * Obtenir les enregistrements non synchronisés
    */
-  async getUnsyncedRecords(table: string): Promise<any[]> {
+  async getUnsyncedRecords(table: string): Promise<Array<Record<string, unknown>>> {
     try {
-      const tableObj = this.table(table)
+      type SyncedRecord = { syncedAt?: Date }
+      const tableObj = this.table(table) as Table<SyncedRecord & Record<string, unknown>, unknown>
+
       const records = await tableObj
         .filter(record => record.syncedAt === undefined)
         .toArray()
@@ -453,7 +455,7 @@ export class TrackBeeDatabase extends Dexie {
         return null
       }
 
-      return state.value
+      return state.value as T
     } catch (error) {
       databaseLog.error('Failed to get app state', { key, error })
       return null
@@ -482,7 +484,8 @@ export class TrackBeeDatabase extends Dexie {
 
         // Compter les non-synchronisés (table sans index syncedAt, on skip)
         try {
-          const unsynced = await table
+          const typedTable = table as Table<{ syncedAt?: Date } & Record<string, unknown>, unknown>
+          const unsynced = await typedTable
             .filter(record => record.syncedAt === undefined)
             .count()
           unsyncedCount += unsynced
@@ -544,4 +547,3 @@ export const withTransaction = async <T>(
     throw error
   }
 }
-

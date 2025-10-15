@@ -1,29 +1,25 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * useSite Hook - Gestion principale des sites géographiques
  * Interface unifiée pour CRUD sites, installations et géocodage
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { eventBus, useEventBus } from '@/core/orchestrator/EventBus'
+import { useEventBus } from '@/core/orchestrator/EventBus'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
-import type { AppError } from '@/core/types/common'
-// PUSH FINAL: Types temporaires avec any pour déblocage massif
-type SiteBundle = any
-type SiteStatistics = any
-type CreateSiteData = any
-type UpdateSiteData = any
-type CreateInstallationData = any
-type UpdateInstallationData = any
-type SiteExportData = any
-type GeocodeResult = any
-type GeocodeOptions = any
-type UseSiteDetailReturn = any
-type SiteError = any
-type SiteErrorMessages = any
+import { AppError } from '@/core/types/common'
 import type { Site, Installation, Machine, Campaign, Calculation, SiteId, InstallationId } from '@/core/types'
+import type {
+  SiteBundle,
+  SiteStatistics,
+  UpdateSiteData,
+  CreateInstallationData,
+  UpdateInstallationData,
+  SiteExportData,
+  UseSiteDetailReturn,
+  SiteError
+} from '../types'
 
 // ==================== LOGGER SETUP ====================
 
@@ -60,8 +56,9 @@ export const siteQueryKeys = {
 const fetchSite = async (id: SiteId): Promise<Site> => {
   siteLog.debug('Fetching site', { id })
   const response = await httpClient.get<Site>(`/api/sites/${id}`)
-  siteLog.debug('Site fetched', { site: response })
-  return response
+  const site = response.data!
+  siteLog.debug('Site fetched', { site })
+  return site
 }
 
 /**
@@ -70,22 +67,27 @@ const fetchSite = async (id: SiteId): Promise<Site> => {
 const fetchSiteBundle = async (id: SiteId): Promise<SiteBundle> => {
   siteLog.debug('Fetching site bundle', { id })
 
-  const [site, installations, campaigns, calculations] = await Promise.all([
+  const [site, installationsResp, campaignsResp, calculationsResp] = await Promise.all([
     fetchSite(id),
     httpClient.get<Installation[]>(`/api/sites/${id}/installations`),
     httpClient.get<Campaign[]>(`/api/sites/${id}/campaigns`),
     httpClient.get<Calculation[]>(`/api/sites/${id}/calculations`)
   ])
 
+  const installations = installationsResp.data!
+  const campaigns = campaignsResp.data!
+  const calculations = calculationsResp.data!
+
   // Récupérer les machines associées aux installations
   const machineIds = installations.map(i => i.machineId)
   const machines: Machine[] = []
 
   if (machineIds.length > 0) {
-    const machinePromises = machineIds.map(id =>
-      httpClient.get<Machine>(`/api/machines/${id}`)
+    const machinePromises = machineIds.map(machineId =>
+      httpClient.get<Machine>(`/api/machines/${machineId}`)
     )
-    machines.push(...await Promise.all(machinePromises))
+    const machineResponses = await Promise.all(machinePromises)
+    machines.push(...machineResponses.map(resp => resp.data!))
   }
 
   // Calculer les statistiques
@@ -122,8 +124,9 @@ const fetchSiteBundle = async (id: SiteId): Promise<SiteBundle> => {
 const updateSite = async (id: SiteId, data: UpdateSiteData): Promise<Site> => {
   siteLog.debug('Updating site', { id, data })
   const response = await httpClient.put<Site>(`/api/sites/${id}`, data)
-  siteLog.info('Site updated', { site: response })
-  return response
+  const site = response.data!
+  siteLog.info('Site updated', { site })
+  return site
 }
 
 /**
@@ -138,11 +141,12 @@ const deleteSite = async (id: SiteId): Promise<void> => {
 /**
  * Crée une nouvelle installation
  */
-const createInstallation = async (data: CreateInstallationData): Promise<Installation> => {
+const createInstallation = async (data: CreateInstallationData & { siteId: SiteId }): Promise<Installation> => {
   siteLog.debug('Creating installation', { data })
   const response = await httpClient.post<Installation>('/api/installations', data)
-  siteLog.info('Installation created', { installation: response })
-  return response
+  const installation = response.data!
+  siteLog.info('Installation created', { installation })
+  return installation
 }
 
 /**
@@ -151,8 +155,9 @@ const createInstallation = async (data: CreateInstallationData): Promise<Install
 const updateInstallation = async (id: InstallationId, data: UpdateInstallationData): Promise<Installation> => {
   siteLog.debug('Updating installation', { id, data })
   const response = await httpClient.put<Installation>(`/api/installations/${id}`, data)
-  siteLog.info('Installation updated', { installation: response })
-  return response
+  const installation = response.data!
+  siteLog.info('Installation updated', { installation })
+  return installation
 }
 
 /**
@@ -178,19 +183,36 @@ const exportSiteData = async (siteId: SiteId, options: SiteExportData): Promise<
     ...(options.coordinateSystem && { coordinateSystem: options.coordinateSystem })
   })
 
-  const response = await httpClient.get(
+  const response = await httpClient.get<Blob>(
     `/api/sites/${siteId}/export?${params}`,
     { responseType: 'blob' }
   )
 
+  const blob = response.data
+  if (!blob) {
+    throw new AppError('Site export failed: empty response', 'PERMISSION_DENIED')
+  }
+
   siteLog.info('Site data exported', { siteId, format: options.format })
-  return response as Blob
+  return blob
 }
 
 /**
  * Géocode une adresse
  */
-const geocodeAddress = async (options: GeocodeOptions): Promise<GeocodeResult[]> => {
+interface GeocodeOptions {
+  address: string
+  language?: string
+  region?: string
+}
+
+interface GeocodeResult {
+  lat: number
+  lng: number
+  formattedAddress: string
+}
+
+const _geocodeAddress = async (options: GeocodeOptions): Promise<GeocodeResult[]> => {
   siteLog.debug('Geocoding address', { options })
 
   const params = new URLSearchParams({
@@ -200,18 +222,30 @@ const geocodeAddress = async (options: GeocodeOptions): Promise<GeocodeResult[]>
   })
 
   const response = await httpClient.get<GeocodeResult[]>(`/api/geocode?${params}`)
+  const results = response.data!
 
   siteLog.debug('Address geocoded', {
     address: options.address,
-    resultCount: response.length
+    resultCount: results.length
   })
 
-  return response
+  return results
 }
 
 // ==================== SITE ERROR HELPER ====================
 
 const createSiteError = (type: SiteError, originalError?: Error): AppError => {
+  const SiteErrorMessages: Record<SiteError, string> = {
+    SITE_NOT_FOUND: 'Site not found',
+    SITE_ALREADY_EXISTS: 'A site with this name already exists',
+    INVALID_COORDINATES: 'Provided coordinates are invalid',
+    GEOCODING_FAILED: 'Geocoding request failed',
+    INSTALLATION_FAILED: 'Installation operation failed',
+    PERMISSION_DENIED: 'Permission denied',
+    SITE_HAS_INSTALLATIONS: 'Cannot delete site with active installations',
+    MACHINE_ALREADY_INSTALLED: 'Device is already installed on this site',
+    COORDINATE_SYSTEM_INVALID: 'Unsupported coordinate system'
+  }
   return new AppError(
     SiteErrorMessages[type],
     type,
@@ -235,7 +269,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
     data: site,
     isLoading,
     error: queryError,
-    refetch
+    refetch: refetchSite
   } = useQuery({
     queryKey: siteQueryKeys.bundle(siteId),
     queryFn: () => fetchSiteBundle(siteId),
@@ -258,7 +292,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.lists() })
 
       // Événement global
-      eventBus.emit('site:updated', { siteId, site: updatedSite })
+      eventBus.emit({ type: 'site:updated', data: { siteId, site: updatedSite } } as any)
 
       siteLog.info('Site updated successfully', { site: updatedSite })
     },
@@ -277,7 +311,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.lists() })
 
       // Événement global
-      eventBus.emit('site:deleted', { siteId })
+      eventBus.emit({ type: 'site:deleted', data: { siteId } } as any)
 
       siteLog.info('Site deleted successfully', { siteId })
     },
@@ -295,7 +329,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.installations(siteId) })
 
       // Événement global
-      eventBus.emit('installation:created', { siteId, installation })
+      eventBus.emit({ type: 'installation:created', data: { siteId, installation } } as any)
 
       siteLog.info('Installation created successfully', { installation })
     },
@@ -314,7 +348,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.installations(siteId) })
 
       // Événement global
-      eventBus.emit('installation:updated', { siteId, installation })
+      eventBus.emit({ type: 'installation:updated', data: { siteId, installation } } as any)
 
       siteLog.info('Installation updated successfully', { installation })
     },
@@ -332,7 +366,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
       queryClient.invalidateQueries({ queryKey: siteQueryKeys.installations(siteId) })
 
       // Événement global
-      eventBus.emit('installation:removed', { siteId, installationId })
+      eventBus.emit({ type: 'installation:removed', data: { siteId, installationId } } as any)
 
       siteLog.info('Installation removed successfully', { installationId })
     },
@@ -351,7 +385,7 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
       const blob = await exportSiteData(siteId, options)
 
       // Événement global
-      eventBus.emit('site:exported', { siteId, format: options.format })
+      eventBus.emit({ type: 'site:exported', data: { siteId, format: options.format } } as any)
 
       return blob
 
@@ -391,7 +425,9 @@ export const useSite = (siteId: SiteId): UseSiteDetailReturn => {
     site: site || null,
     isLoading,
     error,
-    refetch,
+    refetch: async () => {
+      await refetchSite()
+    },
     updateSite: updateSiteHandler,
     deleteSite: deleteSiteHandler,
     createInstallation: createInstallationHandler,

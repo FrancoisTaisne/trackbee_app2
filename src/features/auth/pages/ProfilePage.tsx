@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react'
-import { User, Mail, Lock, Save, Camera, Shield } from 'lucide-react'
+import { User, Mail, Lock, Save } from 'lucide-react'
 import {
   AppLayout,
   PageHeader,

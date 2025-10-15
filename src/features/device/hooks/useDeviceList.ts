@@ -1,30 +1,44 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * useDeviceList Hook - Gestion de la liste des devices
  * Interface pour lister, filtrer, créer et supprimer des devices
+ * REFACTORED: Utilise désormais useHydrate pour une approche centralisée
  */
 
 import { useCallback, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-// PUSH FINAL: Imports corrigés avec noms exacts des fichiers
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useDeviceStore } from '@/core/state/stores/device.store'
+import { useBleStore } from '@/core/state/stores/ble.store'
 import { useEventBus } from '@/core/orchestrator/EventBus'
-
-// PUSH FINAL: Store BLE temporaire avec any
-const useBleStore: any = () => ({})
+import { useHydrate } from '@/core/hooks/useHydrate'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
-import type { AppError } from '@/core/types/common'
+import { AppError } from '@/core/types/common'
 import { deviceQueryKeys } from './useDevice'
+import type { Machine } from '@/core/types'
 import type {
   DeviceBundle,
   CreateDeviceData,
   UpdateDeviceData,
-  UseDeviceListReturn,
-  DeviceError,
-  DeviceErrorMessages
+  UseDeviceListReturn
 } from '../types'
-import type { Machine, Site, Installation } from '@/core/types'
+import { mapHydrationToDeviceBundles } from '../utils/mapHydrationToDeviceBundles'
+
+type DeviceError =
+  | 'DEVICE_NOT_FOUND'
+  | 'INVALID_DEVICE_ID'
+  | 'INSTALLATION_NOT_FOUND'
+  | 'NETWORK_ERROR'
+  | 'DEVICE_ALREADY_EXISTS'
+  | 'BLE_SCAN_FAILED'
+
+const DeviceErrorMessages: Record<DeviceError, string> = {
+  DEVICE_NOT_FOUND: 'Device not found',
+  INVALID_DEVICE_ID: 'Invalid device ID',
+  INSTALLATION_NOT_FOUND: 'Installation not found',
+  NETWORK_ERROR: 'Network error occurred',
+  DEVICE_ALREADY_EXISTS: 'Device already exists',
+  BLE_SCAN_FAILED: 'BLE scan failed'
+}
 
 // ==================== LOGGER SETUP ====================
 
@@ -39,153 +53,29 @@ const deviceListLog = {
 // ==================== API FUNCTIONS ====================
 
 /**
- * Récupère tous les devices avec leurs relations depuis IndexedDB
+ * Récupère tous les devices avec leurs relations - Backend First Strategy
  */
-const fetchDeviceBundles = async (): Promise<DeviceBundle[]> => {
-  deviceListLog.debug('🔄 Fetching device bundles from IndexedDB...')
 
-  try {
-    // Import du service centralisé pour accès aux données locales
-    const { DataService } = await import('@/core/services/data/DataService')
-
-    // Récupérer les bundles depuis la base de données locale
-    const bundles = await DataService.buildDeviceBundles()
-
-    // Transformer le format pour correspondre aux types attendus
-    const deviceBundles: DeviceBundle[] = bundles.map(bundle => ({
-      machine: {
-        id: bundle.id,
-        name: bundle.name,
-        macAddress: bundle.macAddress,
-        model: bundle.model,
-        isActive: bundle.isActive,
-        lastConnectionState: bundle.connected ? 'connected' : 'disconnected',
-        lastSeenAt: bundle.lastSeenAt,
-        description: '', // Default
-        type: 'trackbee', // Default
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      installation: bundle.installation ? {
-        id: bundle.installation.id,
-        machineId: bundle.id,
-        siteId: bundle.site?.id || 0,
-        isActive: bundle.installation.isActive,
-        installedAt: bundle.installation.installedAt,
-        createdAt: bundle.installation.installedAt,
-        updatedAt: bundle.installation.installedAt
-      } : undefined,
-      site: bundle.site ? {
-        id: bundle.site.id,
-        name: bundle.site.name,
-        description: '', // Default
-        coordinates: bundle.site.location?.latitude && bundle.site.location?.longitude ? {
-          latitude: bundle.site.location.latitude,
-          longitude: bundle.site.location.longitude
-        } : undefined,
-        address: '', // Default
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } : undefined,
-      campaigns: [], // TODO: Implémenter récupération campaigns depuis IndexedDB
-      calculations: [] // TODO: Implémenter récupération calculations depuis IndexedDB
-    }))
-
-    deviceListLog.info('✅ Device bundles fetched from IndexedDB', { count: deviceBundles.length })
-    return deviceBundles
-
-  } catch (error) {
-    deviceListLog.error('❌ Failed to fetch device bundles from IndexedDB', { error })
-
-    // Fallback: essayer de récupérer depuis l'API si la DB locale échoue
-    deviceListLog.warn('🔄 Falling back to API for device bundles...')
-
-    try {
-      const { MachineService, SiteService } = await import('@/core/services/api/services')
-
-      const [machines, sites] = await Promise.all([
-        MachineService.list(),
-        SiteService.list()
-      ])
-
-      // Construire des bundles basiques depuis l'API
-      const apiBundles: DeviceBundle[] = machines.map(machine => ({
-        machine,
-        installation: undefined,
-        site: undefined,
-        campaigns: [],
-        calculations: []
-      }))
-
-      deviceListLog.warn('⚠️ Device bundles fetched from API fallback', { count: apiBundles.length })
-      return apiBundles
-
-    } catch (apiError) {
-      deviceListLog.error('❌ Both IndexedDB and API failed for device bundles', { apiError })
-      return []
-    }
-  }
-}
-
-/**
- * Crée un nouveau device
- */
 const createDevice = async (data: CreateDeviceData): Promise<Machine> => {
-  deviceListLog.debug('Creating device', { data })
-
-  // Valider les données avant envoi
-  if (!data.name.trim()) {
-    throw new AppError('Le nom du device est obligatoire', 'VALIDATION_ERROR')
+  const response = await httpClient.post<Machine>('/api/machine', data)
+  const created = response.data
+  if (!created) {
+    throw new AppError('Failed to create device', 'DEVICE_NOT_FOUND')
   }
-
-  if (!data.macAddress.match(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/)) {
-    throw new AppError('Format d\'adresse MAC invalide', 'VALIDATION_ERROR')
-  }
-
-  const response = await httpClient.post<Machine>('/api/machines', {
-    name: data.name.trim(),
-    description: data.description?.trim(),
-    macAddress: data.macAddress.toUpperCase(),
-    type: data.type || 'trackbee',
-    model: data.model?.trim(),
-    isActive: true
-  })
-
-  deviceListLog.info('Device created successfully', { device: response })
-  return response
+  return created
 }
 
-/**
- * Met à jour un device
- */
 const updateDevice = async (id: number, data: UpdateDeviceData): Promise<Machine> => {
-  deviceListLog.debug('Updating device', { id, data })
-
-  const response = await httpClient.put<Machine>(`/api/machines/${id}`, data)
-
-  deviceListLog.info('Device updated successfully', { device: response })
-  return response
+  const response = await httpClient.put<Machine>(`/api/machine/${id}`, data)
+  const updated = response.data
+  if (!updated) {
+    throw new AppError('Device update failed', 'DEVICE_NOT_FOUND')
+  }
+  return updated
 }
 
-/**
- * Supprime un device
- */
 const deleteDevice = async (id: number): Promise<void> => {
-  deviceListLog.debug('Deleting device', { id })
-
-  // Vérifier si le device peut être supprimé
-  const installations = await httpClient.get<Installation[]>(`/api/machines/${id}/installations`)
-  if (installations.length > 0) {
-    throw new AppError(
-      'Impossible de supprimer un device associé à un site. Retirez-le d\'abord du site.',
-      'CONSTRAINT_VIOLATION'
-    )
-  }
-
-  await httpClient.delete(`/api/machines/${id}`)
-
-  deviceListLog.info('Device deleted successfully', { id })
+  await httpClient.delete(`/api/machine/${id}`)
 }
 
 // ==================== DEVICE ERROR HELPER ====================
@@ -213,26 +103,25 @@ export const useDeviceList = (filters?: {
   const queryClient = useQueryClient()
   const eventBus = useEventBus()
   const deviceStore = useDeviceStore()
-  const bleStore = useBleStore()
+  const bleConnections = useBleStore(state => state.connections)
+  const removeBleConnection = useBleStore(state => state.removeConnection)
 
-  // ==================== QUERY ====================
+  // ==================== USE HYDRATE DATA ====================
 
-  const {
-    data: rawDevices = [],
-    isLoading,
-    error: queryError,
-    refetch
-  } = useQuery({
-    queryKey: deviceQueryKeys.list(filters),
-    queryFn: fetchDeviceBundles,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnWindowFocus: true,
-    retry: (failureCount, error) => {
-      deviceListLog.warn('Device list fetch failed, retrying', { failureCount, error })
-      return failureCount < 3
-    }
-  })
+  const { data: hydrateData, machines, sites, isLoading: hydrateLoading, error: hydrateError, refetch } = useHydrate()
+
+  // Construire les bundles depuis les données hydratées
+  const rawDevices = useMemo<DeviceBundle[]>(() =>
+    mapHydrationToDeviceBundles({
+      hydrateData,
+      machines,
+      sites,
+      bleConnections
+    })
+  , [hydrateData, machines, sites, bleConnections])
+
+  const isLoading = hydrateLoading
+  const queryError = hydrateError
 
   // ==================== FILTERED DEVICES ====================
 
@@ -242,7 +131,7 @@ export const useDeviceList = (filters?: {
     // Ajouter l'état de connexion BLE à chaque device
     filtered = filtered.map(bundle => ({
       ...bundle,
-      bleConnection: bleStore.connections[bundle.machine.id]
+      bleConnection: bleConnections[String(bundle.machine.id)]
     }))
 
     // Filtrage par recherche textuelle
@@ -251,8 +140,8 @@ export const useDeviceList = (filters?: {
       filtered = filtered.filter(bundle =>
         bundle.machine.name.toLowerCase().includes(searchLower) ||
         bundle.machine.description?.toLowerCase().includes(searchLower) ||
-        bundle.machine.macAddress.toLowerCase().includes(searchLower) ||
-        bundle.site?.name.toLowerCase().includes(searchLower)
+        (bundle.machine.macAddress ?? '').toLowerCase().includes(searchLower) ||
+        bundle.site?.name?.toLowerCase().includes(searchLower)
       )
     }
 
@@ -266,7 +155,7 @@ export const useDeviceList = (filters?: {
     // Filtrage par état de connexion
     if (filters?.connected !== undefined) {
       filtered = filtered.filter(bundle => {
-        const connection = bleStore.connections[bundle.machine.id]
+        const connection = bleConnections[String(bundle.machine.id)]
         const isConnected = connection?.status === 'connected'
         return filters.connected ? isConnected : !isConnected
       })
@@ -289,7 +178,7 @@ export const useDeviceList = (filters?: {
     })
 
     return filtered
-  }, [rawDevices, bleStore.connections, filters])
+  }, [rawDevices, bleConnections, filters])
 
   // ==================== MUTATIONS ====================
 
@@ -300,10 +189,10 @@ export const useDeviceList = (filters?: {
       queryClient.invalidateQueries({ queryKey: deviceQueryKeys.lists() })
 
       // Mettre à jour le store local
-      deviceStore.addDevice(newDevice)
+      // TODO: deviceStore.addDevice not available yet
 
       // Événement global
-      eventBus.emit('device:created', { device: newDevice })
+      eventBus.emit({ type: 'device:created', data: { device: newDevice } } as any)
 
       deviceListLog.info('Device created and caches updated', { device: newDevice })
     },
@@ -323,10 +212,10 @@ export const useDeviceList = (filters?: {
       queryClient.invalidateQueries({ queryKey: deviceQueryKeys.bundle(updatedDevice.id) })
 
       // Mettre à jour le store local
-      deviceStore.updateDevice(updatedDevice.id, updatedDevice)
+      // TODO: deviceStore.updateDevice not available yet
 
       // Événement global
-      eventBus.emit('device:updated', { deviceId: updatedDevice.id, device: updatedDevice })
+      eventBus.emit({ type: 'device:updated', data: { deviceId: String(updatedDevice.id) } } as any)
 
       deviceListLog.info('Device updated and caches invalidated', { device: updatedDevice })
     },
@@ -345,15 +234,13 @@ export const useDeviceList = (filters?: {
       queryClient.removeQueries({ queryKey: deviceQueryKeys.bundle(deletedId) })
 
       // Nettoyer le store local
-      deviceStore.removeDevice(deletedId)
+      // TODO: deviceStore.removeDevice not available yet
 
       // Nettoyer la connexion BLE si elle existe
-      if (bleStore.connections[deletedId]) {
-        bleStore.removeConnection(deletedId)
-      }
+      removeBleConnection(deletedId)
 
       // Événement global
-      eventBus.emit('device:deleted', { deviceId: deletedId })
+      eventBus.emit({ type: 'device:deleted', data: { deviceId: String(deletedId) } } as any)
 
       deviceListLog.info('Device deleted and cleaned up', { deviceId: deletedId })
     },
@@ -402,7 +289,7 @@ export const useDeviceList = (filters?: {
     devices,
     isLoading,
     error,
-    refetch,
+    refetch: async () => { refetch() },
     createDevice: createDeviceHandler,
     updateDevice: updateDeviceHandler,
     deleteDevice: deleteDeviceHandler,

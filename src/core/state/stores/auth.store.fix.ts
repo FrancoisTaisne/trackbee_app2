@@ -27,16 +27,19 @@ export const authStorageFix = {
 
       // 1. Vérifier les clés de storage
       const [
-        secureToken,
-        secureSession,
+        tokenRes,
+        sessionRes,
         userData,
         lastActivity
       ] = await Promise.all([
-        storageManager.get('auth_token', { type: 'secure' }),
-        storageManager.get('user_session', { type: 'secure' }),
+        storageManager.getWithFallback('auth_token'),
+        storageManager.getWithFallback('user_session'),
         storageManager.get('user_data'),
         storageManager.get('last_activity')
       ])
+
+      const secureToken = tokenRes?.value
+      const secureSession = sessionRes?.value
 
       // 2. Vérifier aussi les clés Capacitor
       const [
@@ -80,10 +83,13 @@ export const authStorageFix = {
       // 4. Vérifier la validité des sessions
       if (hasSession) {
         const session = secureSession || capacitorSession
-        if (session && typeof session === 'object' && session.expiresAt) {
-          const expirationDate = new Date(session.expiresAt)
-          if (expirationDate.getTime() < Date.now()) {
-            issues.push('Session expirée')
+        if (session && typeof session === 'object' && 'expiresAt' in session) {
+          const expiration = (session as { expiresAt?: string | number | Date }).expiresAt
+          if (expiration) {
+            const expirationDate = new Date(expiration)
+            if (!Number.isNaN(expirationDate.getTime()) && expirationDate.getTime() < Date.now()) {
+              issues.push('Session expirée')
+            }
           }
         }
       }
@@ -107,7 +113,7 @@ export const authStorageFix = {
             permissions: ['read'],
             roles: ['user']
           }
-          await storageManager.set('user_session', basicSession, { type: 'secure' })
+          await storageManager.setWithFallback('user_session', basicSession)
           fixed = true
           stateLog.info('🔧 Recreated basic session')
         }
@@ -159,14 +165,21 @@ export const authStorageFix = {
     ]
 
     await Promise.all([
-      // Clear storage manager
-      ...keys.map(key => storageManager.remove(key, { type: 'secure' }).catch(() => {})),
-      ...keys.map(key => storageManager.remove(key).catch(() => {})),
+      // Clear storage manager (multi-backend)
+      ...keys.flatMap(key => (
+        ['secure','preferences','local'].map(type => {
+          try {
+            // @ts-expect-error: type narrowed
+            return storageManager.remove(key, { type }).catch(() => {})
+          } catch {
+            // Silently ignore
+            return Promise.resolve()
+          }
+        })
+      )),
       // Clear localStorage directement
       ...keys.map(key => {
-        try {
-          localStorage.removeItem(key)
-        } catch {}
+        try { localStorage.removeItem(key) } catch { /* Silently ignore */ }
       })
     ])
 
@@ -177,13 +190,13 @@ export const authStorageFix = {
    * Diagnostiquer l'état complet du storage
    */
   async diagnosePersistentState(): Promise<{
-    localStorage: Record<string, any>
-    storageManager: Record<string, any>
+    localStorage: Record<string, unknown>
+    storageManager: Record<string, unknown>
     recommendations: string[]
   }> {
     const diagnosis = {
-      localStorage: {} as Record<string, any>,
-      storageManager: {} as Record<string, any>,
+      localStorage: {} as Record<string, unknown>,
+      storageManager: {} as Record<string, unknown>,
       recommendations: [] as string[]
     }
 
@@ -249,15 +262,16 @@ export const authStorageFix = {
   async forceSyncAuthData(): Promise<boolean> {
     try {
       // Essayer de récupérer les données depuis différentes sources
-      const sources = await Promise.all([
-        storageManager.get('auth_token', { type: 'secure' }),
-        storageManager.get('user_session', { type: 'secure' }),
+      const [tokenRes2, sessionRes2, userData, capacitorToken, capacitorSession] = await Promise.all([
+        storageManager.getWithFallback('auth_token'),
+        storageManager.getWithFallback('user_session'),
         storageManager.get('user_data'),
         storageManager.get('CapacitorStorage.secure_auth_token'),
         storageManager.get('CapacitorStorage.secure_user_session')
       ])
 
-      const [secureToken, secureSession, userData, capacitorToken, capacitorSession] = sources
+      const secureToken = tokenRes2?.value
+      const secureSession = sessionRes2?.value
 
       // Utiliser la meilleure source disponible
       const bestToken = secureToken || capacitorToken
@@ -266,8 +280,8 @@ export const authStorageFix = {
       if (bestToken && bestSession && userData) {
         // Re-sauvegarder dans le format standard
         await Promise.all([
-          storageManager.set('auth_token', bestToken, { type: 'secure' }),
-          storageManager.set('user_session', bestSession, { type: 'secure' }),
+          storageManager.setWithFallback('auth_token', bestToken),
+          storageManager.setWithFallback('user_session', bestSession),
           storageManager.set('user_data', userData),
           storageManager.set('last_activity', new Date().toISOString())
         ])

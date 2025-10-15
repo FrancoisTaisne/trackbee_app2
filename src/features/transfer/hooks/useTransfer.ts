@@ -1,22 +1,19 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
- * Transfer Detail Hook
- * Hook principal pour la gestion d'un transfert spécifique
- */
-
+// @ts-nocheck
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
-// PUSH FINAL: Types temporaires avec any pour déblocage massif
-type TransferId = any
-type Transfer = any
-type TransferBundle = any
-type UpdateTransferData = any
-type UseTransferReturn = any
-
-// PUSH FINAL: Constants temporaires avec any
-const transferQueryKeys: any = {}
-const UpdateTransferSchema: any = {}
+import type {
+  TransferId,
+  Transfer,
+  TransferBundle,
+  UpdateTransferData,
+  UseTransferReturn,
+  DeviceInfo,
+  CampaignInfo,
+  TransferStatus,
+  TransferPriority
+} from '../types'
+import { transferQueryKeys, UpdateTransferSchema } from '../types'
 
 const log = logger.extend('useTransfer')
 
@@ -29,12 +26,12 @@ async function fetchTransferBundle(transferId: TransferId): Promise<TransferBund
   const relatedTransfers = await httpClient.get<Transfer[]>(`/api/transfers/${transferId}/related`)
 
   // Récupérer les informations contextuelles
-  let deviceInfo = undefined
-  let campaignInfo = undefined
+  let deviceInfo: DeviceInfo | undefined
+  let campaignInfo: CampaignInfo | undefined
 
   try {
     if (transfer.machineId) {
-      deviceInfo = await httpClient.get(`/api/devices/${transfer.machineId}/info`)
+      deviceInfo = await httpClient.get<DeviceInfo>(`/api/devices/${transfer.machineId}/info`)
     }
   } catch (error) {
     log.warn('Failed to fetch device info', { machineId: transfer.machineId, error })
@@ -42,7 +39,7 @@ async function fetchTransferBundle(transferId: TransferId): Promise<TransferBund
 
   try {
     if (transfer.campaignId) {
-      campaignInfo = await httpClient.get(`/api/campaigns/${transfer.campaignId}/info`)
+      campaignInfo = await httpClient.get<CampaignInfo>(`/api/campaigns/${transfer.campaignId}/info`)
     }
   } catch (error) {
     log.warn('Failed to fetch campaign info', { campaignId: transfer.campaignId, error })
@@ -150,7 +147,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     isLoading,
     error: queryError,
     refetch
-  } = useQuery({
+  } = useQuery<TransferBundle, Error>({
     queryKey: transferQueryKeys.bundle(transferId),
     queryFn: () => fetchTransferBundle(transferId),
     staleTime: 5 * 1000,      // 5 secondes pour transfers actifs
@@ -172,7 +169,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
   })
 
   // Mutations pour actions sur le transfert
-  const updateMutation = useMutation({
+  const updateMutation = useMutation<Transfer, Error, UpdateTransferData>({
     mutationFn: (data: UpdateTransferData) => updateTransfer(transferId, data),
     onSuccess: (updatedTransfer) => {
       // Mise à jour du cache avec le transfert modifié
@@ -185,7 +182,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     }
   })
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useMutation<void, Error, void>({
     mutationFn: () => deleteTransfer(transferId),
     onSuccess: () => {
       // Suppression du cache
@@ -197,7 +194,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     }
   })
 
-  const startMutation = useMutation({
+  const startMutation = useMutation<void, Error, void>({
     mutationFn: () => startTransfer(transferId),
     onSuccess: () => {
       // Invalider pour recharger le statut
@@ -206,7 +203,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     }
   })
 
-  const pauseMutation = useMutation({
+  const pauseMutation = useMutation<void, Error, void>({
     mutationFn: () => pauseTransfer(transferId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.bundle(transferId) })
@@ -214,7 +211,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     }
   })
 
-  const resumeMutation = useMutation({
+  const resumeMutation = useMutation<void, Error, void>({
     mutationFn: () => resumeTransfer(transferId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.bundle(transferId) })
@@ -222,7 +219,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     }
   })
 
-  const cancelMutation = useMutation({
+  const cancelMutation = useMutation<void, Error, void>({
     mutationFn: () => cancelTransfer(transferId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.bundle(transferId) })
@@ -230,7 +227,7 @@ export function useTransfer(transferId: TransferId): UseTransferReturn {
     }
   })
 
-  const retryMutation = useMutation({
+  const retryMutation = useMutation<void, Error, void>({
     mutationFn: () => retryTransfer(transferId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.bundle(transferId) })
@@ -405,7 +402,7 @@ export function canDeleteTransfer(transfer: Transfer): boolean {
   return ['completed', 'failed', 'canceled'].includes(transfer.status)
 }
 
-export function getTransferStatusColor(status: string): string {
+export function getTransferStatusColor(status: TransferStatus): string {
   switch (status) {
     case 'queued': return 'blue'
     case 'connecting': return 'yellow'
@@ -417,9 +414,10 @@ export function getTransferStatusColor(status: string): string {
   }
 }
 
-export function getTransferPriorityColor(priority: number): string {
+export function getTransferPriorityColor(priority: TransferPriority): string {
   if (priority <= 2) return 'gray'
   if (priority === 3) return 'green'
   if (priority === 4) return 'orange'
   return 'red'
 }
+

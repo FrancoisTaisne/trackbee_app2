@@ -38,7 +38,13 @@ export class DataService {
    */
   static async getMachineById(id: string | number): Promise<DatabaseMachine | null> {
     try {
-      const machine = await database.machines.get(String(id))
+      const numericId = typeof id === 'string' ? Number(id) : id
+      if (!Number.isFinite(numericId)) {
+        stateLog.warn('⚠️ Invalid machine ID provided', { id })
+        return null
+      }
+
+      const machine = await database.machines.get(numericId)
       return machine || null
     } catch (error) {
       stateLog.error('❌ Failed to get machine by ID', { id, error })
@@ -85,7 +91,13 @@ export class DataService {
    */
   static async getSiteById(id: string | number): Promise<DatabaseSite | null> {
     try {
-      const site = await database.sites.get(String(id))
+      const numericId = typeof id === 'string' ? Number(id) : id
+      if (!Number.isFinite(numericId)) {
+        stateLog.warn('⚠️ Invalid site ID provided', { id })
+        return null
+      }
+
+      const site = await database.sites.get(numericId)
       return site || null
     } catch (error) {
       stateLog.error('❌ Failed to get site by ID', { id, error })
@@ -98,11 +110,17 @@ export class DataService {
    */
   static async searchSites(query: string): Promise<DatabaseSite[]> {
     try {
+      const normalizedQuery = query.trim().toLowerCase()
+      if (!normalizedQuery) {
+        return []
+      }
+
       const sites = await database.sites
-        .filter(site =>
-          site.name?.toLowerCase().includes(query.toLowerCase()) ||
-          site.description?.toLowerCase().includes(query.toLowerCase())
-        )
+        .filter((site) => {
+          const name = site.name?.toLowerCase() ?? ''
+          const description = site.description?.toLowerCase() ?? ''
+          return name.includes(normalizedQuery) || description.includes(normalizedQuery)
+        })
         .toArray()
 
       stateLog.debug('🔍 Sites search completed', { query, count: sites.length })
@@ -258,7 +276,7 @@ export class DataService {
           macAddress: machine.macAddress,
           model: machine.model,
           isActive: installation?.isActive ?? false,
-          connected: machine.lastConnectionState === 'connected',
+          connected: machine.lastConnectionState?.status === 'connected',
           lastSeenAt: machine.lastSeenAt,
 
           // Installation info
@@ -352,7 +370,7 @@ export class DataService {
             totalInstallations: siteInstallations.length,
             activeInstallations: siteInstallations.filter(i => i.isActive).length,
             totalMachines: siteMachines.length,
-            connectedMachines: siteMachines.filter(m => m.lastConnectionState === 'connected').length,
+            connectedMachines: siteMachines.filter(m => m.lastConnectionState?.status === 'connected').length,
             lastActivity: site.lastActivity
           },
 
@@ -368,7 +386,7 @@ export class DataService {
             id: machine.id,
             name: machine.name,
             macAddress: machine.macAddress,
-            connected: machine.lastConnectionState === 'connected'
+           connected: machine.lastConnectionState?.status === 'connected'
           }))
         }
       })

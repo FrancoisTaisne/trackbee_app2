@@ -6,6 +6,7 @@
 import React from 'react'
 import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/components/Button/Button'
+import { logger } from '@/core/utils/logger'
 
 // ==================== TYPES ====================
 
@@ -17,7 +18,7 @@ export interface ErrorInfo {
 
 interface ErrorFallbackProps {
   error: Error
-  resetErrorBoundary: (...args: any[]) => void
+  resetErrorBoundary: (...args: unknown[]) => void
   showDetails?: boolean
   className?: string
 }
@@ -65,13 +66,13 @@ export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
       await navigator.clipboard.writeText(JSON.stringify(errorData, null, 2))
       // TODO: Afficher un toast de succès
     } catch (err) {
-      console.error('Failed to copy error to clipboard:', err)
+      logger.error('error-boundary', 'Failed to copy error to clipboard', { error: err })
     }
   }
 
   const handleReportError = () => {
     // TODO: Implémenter le reporting d'erreur
-    console.log('Report error:', { error, errorId })
+    logger.info('error-boundary', 'Report error placeholder', { error, errorId })
   }
 
   return (
@@ -293,7 +294,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
 
     // Logger l'erreur
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
+    logger.error('error-boundary', 'ErrorBoundary caught an error', {
+      error,
+      errorInfo
+    })
   }
 
   handleReset = () => {

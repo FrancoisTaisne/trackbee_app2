@@ -6,6 +6,7 @@
 // ==================== QUERY CLIENT ====================
 
 import { queryClient as importedQueryClient } from './queryClient'
+import { logger } from '@/core/utils/logger'
 
 export {
   queryClient,
@@ -173,9 +174,13 @@ export const stateUtils = {
    * Export de l'état pour debug
    */
   exportState: () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useAuthStore } = require('./stores/auth.store')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useDeviceStore } = require('./stores/device.store')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useTransferStore } = require('./stores/transfer.store')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useUIStore } = require('./stores/ui.store')
 
     return {
@@ -207,8 +212,8 @@ export const stateUtils = {
   /**
    * Import d'état pour debug/test
    */
-  importState: (state: any) => {
-    console.warn('State import not implemented yet', state)
+  importState: (state: unknown) => {
+    logger.warn('state', 'State import not implemented yet', state)
     // TODO: Implémenter si nécessaire pour les tests
   }
 } as const
@@ -222,9 +227,13 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       ...stateUtils,
       queryClient: importedQueryClient,
       stores: {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         auth: () => require('./stores/auth.store').useAuthStore.getState(),
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         device: () => require('./stores/device.store').useDeviceStore.getState(),
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         transfer: () => require('./stores/transfer.store').useTransferStore.getState(),
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         ui: () => require('./stores/ui.store').useUIStore.getState()
       }
     }

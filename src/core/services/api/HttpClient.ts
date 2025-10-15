@@ -7,7 +7,7 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse,
 import { CapacitorHttp } from '@capacitor/core'
 import type { SystemEvent, ApiResponse, AppError } from '@/core/types/transport'
 import { apiLog, logger } from '@/core/utils/logger'
-import { withTimeout, withRetry, sleep } from '@/core/utils/time'
+import { sleep } from '@/core/utils/time'
 import { appConfig, detectPlatform } from '@/core/utils/env'
 import { idUtils } from '@/core/utils/ids'
 
@@ -170,7 +170,7 @@ export class HttpClient {
   /**
    * GET request
    */
-  async get<T = any>(url: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  async get<T = unknown>(url: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>({ ...options, method: 'GET', url })
   }
 
@@ -178,7 +178,7 @@ export class HttpClient {
    * GET request returning meta (status, headers) alongside data.
    * Useful for cache negotiation (e.g., ETag/If-None-Match).
    */
-  async getWithMeta<T = any>(url: string, options: RequestOptions = {}): Promise<{ data: T; status: number; headers: Record<string, string> }> {
+  async getWithMeta<T = unknown>(url: string, options: RequestOptions = {}): Promise<{ data: T; status: number; headers: Record<string, string> }> {
     const { useCapacitor = detectPlatform().isCapacitor, skipAuth = false, customTimeout = 10000, ...axiosOptions } = options
 
     if (!skipAuth) {
@@ -203,28 +203,54 @@ export class HttpClient {
   /**
    * POST request
    */
-  async post<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  async post<T = unknown>(url: string, data?: unknown, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>({ ...options, method: 'POST', url, data })
+  }
+
+  /**
+   * POST request returning meta (status, headers) alongside data.
+   * Useful for reading auth headers (e.g., Authorization) after login.
+   */
+  async postWithMeta<T = unknown>(url: string, data?: unknown, options: RequestOptions = {}): Promise<{ data: T; status: number; headers: Record<string, string> }> {
+    const { useCapacitor = detectPlatform().isCapacitor, skipAuth = false, customTimeout = 10000, ...axiosOptions } = options
+
+    if (!skipAuth) {
+      const token = await this.tokenManager.getToken()
+      if (token) {
+        axiosOptions.headers = { ...(axiosOptions.headers || {}), 'x-access-token': token }
+      }
+    }
+
+    axiosOptions.timeout = customTimeout
+
+    const resp = useCapacitor
+      ? await this.capacitorRequest({ ...axiosOptions, method: 'POST', url, data })
+      : await this.axiosInstance.request({ ...axiosOptions, method: 'POST', url, data })
+
+    const headers: Record<string, string> = {}
+    Object.entries(resp.headers || {}).forEach(([k, v]) => { headers[k.toLowerCase()] = Array.isArray(v) ? v.join(', ') : String(v) })
+
+    return { data: resp.data as T, status: resp.status, headers }
   }
 
   /**
    * PUT request
    */
-  async put<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  async put<T = unknown>(url: string, data?: unknown, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>({ ...options, method: 'PUT', url, data })
   }
 
   /**
    * PATCH request
    */
-  async patch<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  async patch<T = unknown>(url: string, data?: unknown, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>({ ...options, method: 'PATCH', url, data })
   }
 
   /**
    * DELETE request
    */
-  async delete<T = any>(url: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
+  async delete<T = unknown>(url: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
     return this.request<T>({ ...options, method: 'DELETE', url })
   }
 
@@ -236,7 +262,7 @@ export class HttpClient {
     file: File | Blob,
     options: RequestOptions & {
       fieldName?: string
-      additionalData?: Record<string, any>
+      additionalData?: Record<string, unknown>
       onProgress?: (percent: number) => void
     } = {}
   ): Promise<ApiResponse> {
@@ -296,7 +322,7 @@ export class HttpClient {
       apiLog.debug('Ping failed', { error })
       return {
         ok: false,
-        status: error instanceof Error && 'status' in error ? (error as any).status : undefined
+        status: error instanceof Error && 'status' in error ? (error as { status?: number }).status : undefined
       }
     }
   }
@@ -304,7 +330,7 @@ export class HttpClient {
   /**
    * Request principal avec retry et métriques
    */
-  private async request<T = any>(options: RequestOptions): Promise<ApiResponse<T>> {
+  private async request<T = unknown>(options: RequestOptions): Promise<ApiResponse<T>> {
     const {
       useCapacitor = detectPlatform().isCapacitor,
       skipAuth = false,
@@ -333,7 +359,11 @@ export class HttpClient {
         method: metrics.method,
         url: metrics.url,
         useCapacitor,
-        timeout: customTimeout
+        timeout: customTimeout,
+        payload: axiosOptions.data ? {
+          keys: typeof axiosOptions.data === 'object' ? Object.keys(axiosOptions.data) : ['[non-object]'],
+          hasPassword: typeof axiosOptions.data === 'object' ? ('password' in (axiosOptions.data as Record<string, unknown>)) : false
+        } : undefined
       })
 
       // Ajouter l'auth si nécessaire
@@ -350,21 +380,131 @@ export class HttpClient {
       // Ajouter timeout
       axiosOptions.timeout = customTimeout
 
+      // 🔍 DEBUG: Log juste avant l'envoi
+      apiLog.debug('Preparing HTTP request', {
+        method: metrics.method,
+        url: axiosOptions.url,
+        baseURL: this.axiosInstance.defaults.baseURL,
+        fullUrl: (this.axiosInstance.defaults.baseURL || '') + (axiosOptions.url || ''),
+        headers: axiosOptions.headers,
+        hasPayload: Boolean(axiosOptions.data),
+        useCapacitor
+      })
+
+      if (appConfig.isDev) {
+        let resolvedUrl = (this.axiosInstance.defaults.baseURL || '') + (axiosOptions.url || '')
+        try {
+          if (this.axiosInstance.defaults.baseURL) {
+            resolvedUrl = new URL(axiosOptions.url || '', this.axiosInstance.defaults.baseURL).toString()
+          }
+        } catch {
+          // garde la concaténation simple si new URL échoue
+        }
+
+        const rawHeaders = axiosOptions.headers
+        let safeHeaders: Record<string, unknown> | undefined
+        if (rawHeaders && typeof rawHeaders === 'object') {
+          safeHeaders = { ...(rawHeaders as Record<string, unknown>) }
+          for (const key of Object.keys(safeHeaders)) {
+            const lower = key.toLowerCase()
+            if (lower === 'x-access-token' || lower === 'authorization') {
+              safeHeaders[key] = '[redacted]'
+            }
+          }
+        }
+
+        apiLog.info('HTTP request target', {
+          requestId,
+          method: metrics.method,
+          resolvedUrl,
+          headers: safeHeaders
+        })
+      }
+
+      // 🔍 FORCE Content-Type for JSON payloads (but let Axios handle serialization)
+      if (axiosOptions.data && typeof axiosOptions.data === 'object' && !(axiosOptions.data instanceof FormData)) {
+        // Force JSON headers WITHOUT pre-serializing (Axios will serialize)
+        axiosOptions.headers = {
+          ...axiosOptions.headers,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+
+        // Ensure Axios knows to use JSON transformer
+        axiosOptions.transformRequest = [
+          (data, headers) => {
+            apiLog.debug('🔧 Axios transformRequest', {
+              dataType: typeof data,
+              isObject: typeof data === 'object',
+              headers: headers
+            })
+
+            // Set Content-Type explicitly in headers
+            if (headers) {
+              headers['Content-Type'] = 'application/json'
+            }
+
+            // Return JSON string
+            return JSON.stringify(data)
+          }
+        ]
+
+        apiLog.debug('🔧 Configured JSON serialization for object payload', {
+          dataType: typeof axiosOptions.data,
+          dataKeys: Object.keys(axiosOptions.data),
+          finalHeaders: axiosOptions.headers
+        })
+      }
+
       let response: AxiosResponse
 
       if (useCapacitor && ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(metrics.method)) {
         // Utiliser CapacitorHttp pour les requêtes mobiles
+        apiLog.debug('Using Capacitor HTTP adapter', { requestId, method: metrics.method })
         response = await this.capacitorRequest(axiosOptions)
       } else {
         // Utiliser axios standard
+        apiLog.debug('Using Axios adapter', { requestId, method: metrics.method })
         response = await this.axiosInstance.request(axiosOptions)
+        apiLog.debug('Axios request completed', { requestId, status: response.status })
       }
 
-      // Métriques de succès
+      // Métriques de réponse
       metrics.endTime = Date.now()
       metrics.duration = metrics.endTime - metrics.startTime
       metrics.status = response.status
-      metrics.success = true
+
+      // ⚠️ IMPORTANT: Vérifier le status HTTP pour déterminer le succès
+      const isSuccess = response.status >= 200 && response.status < 300
+      metrics.success = isSuccess
+
+      // 🔍 DEBUG: Log réponse complète avec vrai status
+      const logScope = isSuccess ? 'info' : 'warn'
+      apiLog[logScope]('HTTP response received', {
+        requestId,
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: response.data,
+        duration: metrics.duration,
+        isSuccess
+      })
+
+      // Si le status HTTP indique une erreur, throw une erreur
+      if (!isSuccess) {
+        apiLog.error('❌ HTTP Error Status', {
+          requestId,
+          status: response.status,
+          statusText: response.statusText,
+          data: response.data
+        })
+
+        // Créer une erreur Axios-like pour réutiliser handleRequestError
+        const error = new Error(response.data?.message || `HTTP ${response.status}: ${response.statusText}`) as Error & { response?: AxiosResponse; status?: number }
+        error.response = response
+        error.status = response.status
+        throw error
+      }
 
       const apiResponse: ApiResponse<T> = {
         success: true,
@@ -389,6 +529,24 @@ export class HttpClient {
       metrics.error = error instanceof Error ? error.message : String(error)
 
       timer.end({ error: metrics.error })
+
+      // 🔍 DEBUG: Log erreur complète
+      const axiosError = error as AxiosError
+      apiLog.error('HTTP request error', {
+        requestId,
+        message: axiosError.message,
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        responseData: axiosError.response?.data,
+        responseHeaders: axiosError.response?.headers,
+        requestConfig: {
+          method: axiosError.config?.method,
+          url: axiosError.config?.url,
+          data: axiosError.config?.data,
+          headers: axiosError.config?.headers
+        },
+        duration: metrics.duration
+      })
 
       const appError = this.handleRequestError(error, requestId)
 
@@ -430,6 +588,14 @@ export class HttpClient {
 
   async clearAuth(): Promise<void> {
     await this.tokenManager.clearTokens()
+  }
+
+  /**
+   * Active/désactive l'envoi des cookies (sessions côté serveur)
+   */
+  setWithCredentials(enabled: boolean): void {
+    this.axiosInstance.defaults.withCredentials = enabled
+    apiLog.info('HTTP client withCredentials set', { enabled })
   }
 
   /**
@@ -480,15 +646,28 @@ export class HttpClient {
   }
 
   private setupInterceptors(): void {
+
     // Request interceptor
     this.axiosInstance.interceptors.request.use(
       (config) => {
         this.requestCounter++
 
-        apiLog.trace('Request interceptor', {
+        // ?Y"? DEBUG: Log complet de la requGte
+        const contentTypeHeader = config.headers?.['Content-Type']
+        const isJsonHeader =
+          typeof contentTypeHeader === 'string'
+            ? contentTypeHeader.includes('json')
+            : Array.isArray(contentTypeHeader)
+              ? contentTypeHeader.some((header) => typeof header === 'string' && header.includes('json'))
+              : false
+
+        apiLog.debug('🔧 Request interceptor', {
           url: config.url,
           method: config.method?.toUpperCase(),
-          headers: config.headers
+          headers: config.headers,
+          data: config.data,
+          dataType: typeof config.data,
+          isJSON: isJsonHeader
         })
 
         return config
@@ -536,12 +715,25 @@ export class HttpClient {
   private async capacitorRequest(options: AxiosRequestConfig): Promise<AxiosResponse> {
     const url = `${this.axiosInstance.defaults.baseURL}${options.url}`
 
+    // Ensure Content-Type is set for JSON data
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...(options.headers as Record<string, string> || {})
+    }
+
+    // Serialize data to JSON string if it's an object
+    let data = options.data
+    if (data && typeof data === 'object' && !(data instanceof FormData)) {
+      data = JSON.stringify(data)
+    }
+
     try {
       const response = await CapacitorHttp.request({
         url,
-        method: options.method?.toUpperCase() as any,
-        headers: options.headers as Record<string, string>,
-        data: options.data,
+        method: options.method?.toUpperCase() as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS',
+        headers,
+        data,
         connectTimeout: options.timeout,
         readTimeout: options.timeout
       })
@@ -558,7 +750,7 @@ export class HttpClient {
     } catch (error) {
       // Convertir l'erreur CapacitorHttp en format Axios
       throw {
-        ...(error as Record<string, any>),
+        ...(error as Record<string, unknown>),
         config: options,
         isAxiosError: true
       }

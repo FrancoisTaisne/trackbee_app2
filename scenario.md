@@ -45,7 +45,7 @@ Ce document décrit les scénarios d'usage complets de l'écosystème TrackBee p
 ├── Email: moderator1@test.com
 ├── Password: test123
 ├── → Backend JWT Authentication
-├── → Hydratation données (machines, sites)
+├── → Hydratation données (machines, sites, surveyCampaign,...) Toutes les infos a propos de l'utilisateur  
 └── → IndexedDB storage local
 ```
 

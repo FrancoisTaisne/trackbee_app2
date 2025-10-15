@@ -7,7 +7,6 @@ import React, { type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { queryClient } from '@/core/state/queryClient'
-import { appConfig } from '@/core/utils/env'
 import { stateLog } from '@/core/utils/logger'
 
 // ==================== TYPES ====================

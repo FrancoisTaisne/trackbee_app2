@@ -1,7 +1,6 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
- * SiteDetailPage Component - Page de détail d'un site
- * Interface complète pour gérer un site: installations, campagnes, statistiques
+﻿/**
+ * SiteDetailPage Component - Page de dÃ©tail d'un site
+ * Interface complÃ¨te pour gÃ©rer un site: installations, campagnes, statistiques
  */
 
 import React, { useState, useCallback } from 'react'
@@ -13,15 +12,13 @@ import {
   Settings,
   Activity,
   BarChart3,
-  Users,
   Plus,
   Download,
   Map,
   Globe,
   Lock,
   Calendar,
-  Wifi,
-  ExternalLink
+  Wifi
 } from 'lucide-react'
 import {
   AppLayout,
@@ -45,7 +42,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
+  Breadcrumb
 } from '@/shared/ui/components'
 import {
   SiteMapView,
@@ -56,8 +54,6 @@ import { useSite } from '../hooks'
 import { useDeviceList } from '@/features/device'
 import { logger } from '@/core/utils/logger'
 import { formatDistanceToNow } from '@/core/utils/time'
-import { formatBytes } from '@/core/utils/format'
-import { cn } from '@/core/utils/cn'
 import type {
   SiteBundle,
   UpdateSiteData,
@@ -92,7 +88,7 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
     includeCalculations: true
   })
 
-  const { site: siteData, statistics } = site
+  const { site: siteData } = site
 
   const handleExport = useCallback(() => {
     onExport(exportOptions)
@@ -106,7 +102,7 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Informations générales</CardTitle>
+              <CardTitle>Informations gÃ©nÃ©rales</CardTitle>
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
@@ -137,7 +133,7 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-600">Visibilité</label>
+                <label className="text-sm font-medium text-gray-600">VisibilitÃ©</label>
                 <div className="mt-1 flex items-center space-x-2">
                   {siteData.isPublic ? (
                     <>
@@ -147,11 +143,11 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-gray-400" />
-                      <Badge variant="secondary">Privé</Badge>
+                      <Badge variant="secondary">PrivÃ©</Badge>
                     </>
                   )}
                   {siteData.ownership === 'shared' && (
-                    <Badge variant="primary">Partagé</Badge>
+                    <Badge variant="primary">PartagÃ©</Badge>
                   )}
                 </div>
               </div>
@@ -180,14 +176,14 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
               <div className="pt-4 border-t border-gray-200">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Coordonnées</label>
+                    <label className="text-sm font-medium text-gray-600">CoordonnÃ©es</label>
                     <p className="text-sm font-mono text-gray-900 mt-1">
                       {siteData.lat.toFixed(6)}, {siteData.lng.toFixed(6)}
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Système</label>
+                    <label className="text-sm font-medium text-gray-600">SystÃ¨me</label>
                     <p className="text-sm text-gray-900 mt-1">
                       {siteData.coordinateSystem || 'WGS84'}
                     </p>
@@ -207,8 +203,8 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
 
             <div className="pt-4 border-t border-gray-200 text-xs text-gray-500 space-y-1">
               <p>ID: #{siteData.id}</p>
-              <p>Créé le: {new Date(siteData.createdAt).toLocaleDateString('fr-FR')}</p>
-              <p>Modifié le: {new Date(siteData.updatedAt).toLocaleDateString('fr-FR')}</p>
+              <p>CrÃ©Ã© le: {new Date(siteData.createdAt).toLocaleDateString('fr-FR')}</p>
+              <p>ModifiÃ© le: {new Date(siteData.updatedAt).toLocaleDateString('fr-FR')}</p>
             </div>
           </CardContent>
         </Card>
@@ -239,22 +235,31 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
       >
-        <ModalHeader
-          title="Exporter les données du site"
-          description={`Exporter les données de "${siteData.name}"`}
-        />
+        <ModalHeader>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Exporter les donnees du site
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Exporter les donnees de "{siteData.name}"
+            </p>
+          </div>
+        </ModalHeader>
         <ModalContent className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-gray-700">Format</label>
+            <label className="text-sm font-medium text-gray-700">Donnees a inclure :</label>
             <Select
               value={exportOptions.format}
-              onValueChange={(value: any) => setExportOptions(prev => ({ ...prev, format: value }))}
+              onValueChange={(value) => setExportOptions(prev => ({
+                ...prev,
+                format: value as SiteExportData['format']
+              }))}
             >
               <SelectTrigger className="w-full mt-1">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="json">JSON - Données structurées</SelectItem>
+                <SelectItem value="json">JSON - Donnees structurees</SelectItem>
                 <SelectItem value="csv">CSV - Tableur compatible</SelectItem>
                 <SelectItem value="kml">KML - Google Earth</SelectItem>
                 <SelectItem value="geojson">GeoJSON - Cartographie</SelectItem>
@@ -263,7 +268,7 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-medium text-gray-700">Données à inclure:</label>
+            <label className="text-sm font-medium text-gray-700">Donnees a inclure :</label>
 
             <div className="space-y-2">
               <label className="flex items-center space-x-2">
@@ -290,7 +295,7 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
                   checked={exportOptions.includeCalculations}
                   onChange={(e) => setExportOptions(prev => ({ ...prev, includeCalculations: e.target.checked }))}
                 />
-                <span className="text-sm">Résultats de calculs</span>
+                <span className="text-sm">Resultats de calculs</span>
               </label>
             </div>
           </div>
@@ -371,7 +376,7 @@ const InstallationsTab: React.FC<InstallationsTabProps> = ({
               {statistics.connectedMachines}
             </div>
             <div className="text-sm text-warning-600">
-              Connectées BLE
+              ConnectÃ©es BLE
             </div>
           </div>
         </div>
@@ -402,7 +407,7 @@ const InstallationsTab: React.FC<InstallationsTabProps> = ({
             onClick={onCreateInstallation}
             leftIcon={<Plus className="w-4 h-4" />}
           >
-            Première installation
+            PremiÃ¨re installation
           </Button>
         </div>
       ) : (
@@ -473,7 +478,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
               {statistics.completedCalculations}
             </div>
             <div className="text-sm text-gray-600">
-              Calculs réussis
+              Calculs rÃ©ussis
             </div>
           </CardContent>
         </Card>
@@ -484,7 +489,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
               {statistics.failedCalculations}
             </div>
             <div className="text-sm text-gray-600">
-              Calculs échoués
+              Calculs Ã©chouÃ©s
             </div>
           </CardContent>
         </Card>
@@ -497,7 +502,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Calendar className="w-5 h-5" />
-              <span>Campagnes récentes</span>
+              <span>Campagnes rÃ©centes</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -518,7 +523,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
                         {campaign.name || `Campagne ${campaign.id}`}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {campaign.type} • {formatDistanceToNow(new Date(campaign.createdAt))}
+                        {campaign.type} â€¢ {formatDistanceToNow(new Date(campaign.createdAt))}
                       </div>
                     </div>
                     <Badge
@@ -543,7 +548,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <BarChart3 className="w-5 h-5" />
-              <span>Calculs récents</span>
+              <span>Calculs rÃ©cents</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -564,7 +569,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
                         Calcul #{calculation.id}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {calculation.type} • {formatDistanceToNow(new Date(calculation.createdAt))}
+                        {calculation.type} â€¢ {formatDistanceToNow(new Date(calculation.createdAt))}
                       </div>
                     </div>
                     <Badge
@@ -591,12 +596,12 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Activity className="w-5 h-5" />
-              <span>Dernière activité</span>
+              <span>DerniÃ¨re activitÃ©</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-gray-600">
-              Dernière activité enregistrée: {formatDistanceToNow(statistics.lastActivity)}
+              DerniÃ¨re activitÃ© enregistrÃ©e: {formatDistanceToNow(statistics.lastActivity)}
             </p>
           </CardContent>
         </Card>
@@ -614,7 +619,7 @@ export const SiteDetailPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('info')
   const [showEditForm, setShowEditForm] = useState(false)
-  const [showCreateInstallation, setShowCreateInstallation] = useState(false)
+  const [_showCreateInstallation, setShowCreateInstallation] = useState(false)
 
   // Hooks
   const {
@@ -629,8 +634,8 @@ export const SiteDetailPage: React.FC = () => {
     exportSite
   } = useSite(siteId)
 
-  const { devices: availableDevices } = useDeviceList({
-    // Filtrer les devices non installés sur ce site
+  const { devices: _availableDevices } = useDeviceList({
+    // Filtrer les devices non installÃ©s sur ce site
   })
 
   // ==================== HANDLERS ====================
@@ -650,7 +655,7 @@ export const SiteDetailPage: React.FC = () => {
     }
   }, [updateSite, siteId])
 
-  const handleCreateInstallation = useCallback(async (data: CreateInstallationData) => {
+  const _handleCreateInstallation = useCallback(async (data: CreateInstallationData) => {
     try {
       await createInstallation(data)
       setShowCreateInstallation(false)
@@ -674,7 +679,7 @@ export const SiteDetailPage: React.FC = () => {
     try {
       const blob = await exportSite(options)
 
-      // Créer un lien de téléchargement
+      // CrÃ©er un lien de tÃ©lÃ©chargement
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.style.display = 'none'
@@ -715,10 +720,10 @@ export const SiteDetailPage: React.FC = () => {
             <MapPin className="w-12 h-12 mx-auto" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Site non trouvé
+            Site non trouvÃ©
           </h3>
           <p className="text-gray-600 mb-4">
-            {error?.message || 'Le site demandé n\'existe pas ou n\'est pas accessible.'}
+            {error?.message || 'Le site demandÃ© n\'existe pas ou n\'est pas accessible.'}
           </p>
           <div className="flex justify-center space-x-3">
             <Button variant="outline" onClick={handleBack}>
@@ -726,7 +731,7 @@ export const SiteDetailPage: React.FC = () => {
               Retour
             </Button>
             <Button onClick={() => refetch()}>
-              Réessayer
+              RÃ©essayer
             </Button>
           </div>
         </div>
@@ -767,7 +772,7 @@ export const SiteDetailPage: React.FC = () => {
         title={site.site.name}
         description={
           site.site.description ||
-          `Site géographique avec ${site.statistics.totalInstallations} installation(s)`
+          `Site gÃ©ographique avec ${site.statistics.totalInstallations} installation(s)`
         }
         breadcrumbs={[
           { label: 'Sites', href: '/sites' },
@@ -816,7 +821,7 @@ export const SiteDetailPage: React.FC = () => {
               site={site}
               onCreateInstallation={() => setShowCreateInstallation(true)}
               onEditInstallation={(id) => {
-                // TODO: Implémenter modal d'édition d'installation
+                // TODO: ImplÃ©menter modal d'Ã©dition d'installation
                 siteDetailLog.debug('Edit installation requested', { installationId: id })
               }}
               onRemoveInstallation={handleRemoveInstallation}
@@ -838,3 +843,18 @@ export const SiteDetailPage: React.FC = () => {
 SiteDetailPage.displayName = 'SiteDetailPage'
 
 export default SiteDetailPage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

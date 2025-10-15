@@ -57,7 +57,7 @@ const logResult = (result: TestResult) => {
 const testEndpoint = async (
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
   endpoint: string,
-  data?: any,
+  data?: unknown,
   token?: string
 ): Promise<TestResult> => {
   const startTime = Date.now()
@@ -95,7 +95,7 @@ const testEndpoint = async (
       data: response.data,
       duration
     }
-  } catch (error: any) {
+  } catch (error: Error | unknown) {
     const duration = Date.now() - startTime
     return {
       endpoint,
@@ -141,7 +141,7 @@ export class ApiEndpointTester {
 
       if (result.success && result.data?.token) {
         this.token = result.data.token
-        console.log(`✅ Authentication successful! Token: ${this.token.substring(0, 20)}...`)
+        console.log(`✅ Authentication successful! Token: ${(this.token || '').substring(0, 20)}...`)
 
         // Configurer le token pour les prochaines requêtes
         testClient.defaults.headers.common['Authorization'] = `Bearer ${this.token}`

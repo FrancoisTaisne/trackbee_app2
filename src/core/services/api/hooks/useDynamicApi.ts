@@ -8,7 +8,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { dynamicApiService, type DynamicEndpoint, type ApiOperation } from '../DynamicApiService'
 import { useApiDiscovery } from '@/features/auth/hooks/useApiDiscovery'
 import type { ApiResponse } from '@/core/types/transport'
-import { logger, apiLog } from '@/core/utils/logger'
+import { apiLog } from '@/core/utils/logger'
 
 // ==================== TYPES ====================
 
@@ -35,7 +35,7 @@ export interface UseDynamicApiReturn {
   /** Créer une opération API */
   createOperation: (path: string, method: string) => ApiOperation | null
   /** Exécuter une opération */
-  executeOperation: <T = any>(path: string, method: string, params?: any, data?: any) => Promise<ApiResponse<T>>
+  executeOperation: <T = unknown>(path: string, method: string, params?: Record<string, unknown>, data?: unknown) => Promise<ApiResponse<T>>
   /** Forcer une nouvelle découverte */
   refresh: () => Promise<void>
   /** Statistiques */
@@ -115,11 +115,11 @@ export function useDynamicApi(options: UseDynamicApiOptions = {}): UseDynamicApi
     return dynamicApiService.createOperation(path, method)
   }, [])
 
-  const executeOperation = useCallback(async <T = any>(
+  const executeOperation = useCallback(async <T = unknown>(
     path: string,
     method: string,
-    params?: any,
-    data?: any
+    params?: Record<string, unknown>,
+    data?: unknown
   ): Promise<ApiResponse<T>> => {
     const operation = createOperation(path, method)
     if (!operation) {
@@ -173,7 +173,7 @@ export function useDynamicApi(options: UseDynamicApiOptions = {}): UseDynamicApi
 /**
  * Hook pour exécuter une opération API spécifique avec React Query
  */
-export function useDynamicApiOperation<TData = any, TVariables = any>(
+export function useDynamicApiOperation<TData = unknown, _TVariables = unknown>(
   path: string,
   method: string,
   options: {
@@ -205,7 +205,7 @@ export function useDynamicApiOperation<TData = any, TVariables = any>(
 /**
  * Hook pour une mutation API dynamique
  */
-export function useDynamicApiMutation<TData = any, TVariables = any>(
+export function useDynamicApiMutation<TData = unknown, TVariables = Record<string, unknown>>(
   path: string,
   method: string
 ) {
@@ -213,7 +213,7 @@ export function useDynamicApiMutation<TData = any, TVariables = any>(
 
   return useMutation({
     mutationFn: async (variables: TVariables): Promise<TData> => {
-      const { params, data, ...rest } = variables as any
+      const { params, data } = variables as { params?: Record<string, unknown>; data?: unknown }
 
       const response = await executeOperation<TData>(path, method, params, data)
       if (!response.success) {
@@ -302,7 +302,7 @@ export function useDynamicSites() {
   })
 
   const createSiteMutation = useMutation({
-    mutationFn: async (siteData: any) => {
+    mutationFn: async (siteData: Record<string, unknown>) => {
       const response = await api.createSite(siteData)
       return response.data
     },

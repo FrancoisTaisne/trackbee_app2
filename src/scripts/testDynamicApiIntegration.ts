@@ -100,16 +100,16 @@ class DynamicApiIntegrationTester {
         throw new Error('Authentication failed - no data received')
       }
 
-      const data = response.data as any
+      const data = response.data as unknown
       if (!data.token) {
         throw new Error('Authentication failed - no token received')
       }
 
       this.authToken = data.token
-      await this.httpClient.setAuthToken(this.authToken)
+      await this.httpClient.setAuthToken(this.authToken!)
 
       return {
-        token: this.authToken.substring(0, 20) + '...',
+        token: (this.authToken || '').substring(0, 20) + '...',
         user: data.user
       }
     })
@@ -291,9 +291,10 @@ class DynamicApiIntegrationTester {
         throw new Error('Dynamic login failed')
       }
 
+      const d: unknown = response.data || {}
       return {
-        tokenReceived: !!response.data?.token,
-        user: response.data?.user?.email
+        tokenReceived: !!d.token,
+        user: d.user?.email
       }
     })
 

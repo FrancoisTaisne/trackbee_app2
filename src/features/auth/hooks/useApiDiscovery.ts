@@ -4,10 +4,10 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { openApiDiscovery } from '@/core/services/api/OpenApiDiscovery'
 import type { DiscoveryResult, ApiInfo, DiscoveredEndpoint } from '@/core/services/api/OpenApiDiscovery'
-import { logger } from '@/core/utils/logger'
+import { apiLog } from '@/core/utils/logger'
 
 // ==================== TYPES ====================
 
@@ -30,7 +30,7 @@ export interface UseApiDiscoveryReturn {
   /** Liste des endpoints découverts */
   endpoints: DiscoveredEndpoint[]
   /** Schémas de données disponibles */
-  schemas: Record<string, any>
+  schemas: Record<string, unknown>
   /** État de chargement */
   isLoading: boolean
   /** Erreur éventuelle */
@@ -61,6 +61,7 @@ export function useApiDiscovery(options: UseApiDiscoveryOptions = {}): UseApiDis
   const [isManualRefreshing, setIsManualRefreshing] = useState(false)
 
   // Query principale pour la découverte
+  const log = apiLog
   const {
     data: discovery,
     isLoading: isQueryLoading,
@@ -70,7 +71,7 @@ export function useApiDiscovery(options: UseApiDiscoveryOptions = {}): UseApiDis
   } = useQuery({
     queryKey: ['api-discovery', forceRefresh, timeout],
     queryFn: async (): Promise<DiscoveryResult> => {
-      logger.debug('🔍 Starting API discovery via React hook', { forceRefresh, timeout })
+      log.debug('🔍 Starting API discovery via React hook', { forceRefresh, timeout })
 
       try {
         const result = await openApiDiscovery.discoverApi({
@@ -79,19 +80,19 @@ export function useApiDiscovery(options: UseApiDiscoveryOptions = {}): UseApiDis
         })
 
         if (result.success) {
-          logger.info('✅ API discovery completed successfully', {
+          log.info('✅ API discovery completed successfully', {
             endpoints: result.endpoints.length,
             schemas: Object.keys(result.schemas).length
           })
         } else {
-          logger.warn('⚠️ API discovery completed with errors', {
+          log.warn('⚠️ API discovery completed with errors', {
             errors: result.errors
           })
         }
 
         return result
       } catch (err) {
-        logger.error('❌ API discovery failed in hook', { error: err })
+        log.error('❌ API discovery failed in hook', { error: err })
         throw err
       }
     },
@@ -107,7 +108,7 @@ export function useApiDiscovery(options: UseApiDiscoveryOptions = {}): UseApiDis
   // États dérivés
   const isLoading = isQueryLoading || isManualRefreshing
   const apiInfo = discovery?.apiInfo || null
-  const endpoints = discovery?.endpoints || []
+  const endpoints = useMemo(() => discovery?.endpoints || [], [discovery?.endpoints])
   const schemas = discovery?.schemas || {}
 
   // ==================== ACTIONS ====================
@@ -115,26 +116,26 @@ export function useApiDiscovery(options: UseApiDiscoveryOptions = {}): UseApiDis
   const refresh = useCallback(async () => {
     setIsManualRefreshing(true)
     try {
-      logger.debug('🔄 Manual API discovery refresh triggered')
+      log.debug('🔄 Manual API discovery refresh triggered')
 
       // Forcer un nouveau refresh
       openApiDiscovery.clearCache()
       await refetch()
 
-      logger.info('✅ Manual API discovery refresh completed')
+      log.info('✅ Manual API discovery refresh completed')
     } catch (err) {
-      logger.error('❌ Manual API discovery refresh failed', { error: err })
+      log.error('❌ Manual API discovery refresh failed', { error: err })
       throw err
     } finally {
       setIsManualRefreshing(false)
     }
-  }, [refetch])
+  }, [refetch, log])
 
   const clearCache = useCallback(() => {
-    logger.debug('🗑️ Clearing API discovery cache')
+    log.debug('🗑️ Clearing API discovery cache')
     openApiDiscovery.clearCache()
     queryClient.invalidateQueries({ queryKey: ['api-discovery'] })
-  }, [queryClient])
+  }, [queryClient, log])
 
   // ==================== UTILITAIRES ====================
 
@@ -153,7 +154,7 @@ export function useApiDiscovery(options: UseApiDiscoveryOptions = {}): UseApiDis
   }, [endpoints])
 
   return {
-    discovery,
+    discovery: discovery || null,
     apiInfo,
     endpoints,
     schemas,

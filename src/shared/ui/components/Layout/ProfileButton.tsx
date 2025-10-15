@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/components/Button/Button'
 import { useAuth } from '@/core/state/stores/auth.store'
+import { logger } from '@/core/utils/logger'
 
 // ==================== TYPES ====================
 
@@ -37,63 +38,26 @@ export const ProfileButton: React.FC<ProfileButtonProps> = ({
   const authState = useAuth()
   const { user, isAuthenticated, logout, isLoading, isInitialized } = authState
 
-  // Debug étendu pour comprendre l'état d'authentification
-  console.log('ProfileButton Debug:', {
-    isAuthenticated,
-    isInitialized,
-    user: user ? { email: user.email, id: user.id } : null,
-    isLoading,
-    token: authState.token ? `${authState.token.substring(0, 10)}...` : null,
-    session: authState.session ? 'exists' : 'null'
-  })
+  // Debug minimal uniquement en cas de problème
+  if (import.meta.env.DEV && isInitialized && isAuthenticated && !user) {
+    logger.warn('profile-button', 'Auth state inconsistent', { isAuthenticated, hasUser: Boolean(user) })
+  }
 
   // Vérification plus robuste de l'état d'authentification
   // On attend que l'initialisation soit terminée ET que l'utilisateur soit vraiment connecté
   const isReallyAuthenticated = isInitialized && isAuthenticated && user && user.email
   const isStillInitializing = !isInitialized || isLoading
 
-  // Debug détaillé de la condition d'authentification
-  console.log('ProfileButton Auth Check:', {
-    isInitialized,
-    isAuthenticated,
-    hasUser: !!user,
-    hasUserEmail: !!(user && user.email),
-    isReallyAuthenticated,
-    isStillInitializing
-  })
 
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Force refresh des données au mount si l'état semble incohérent
+  // Auto-repair si état incohérent
   useEffect(() => {
-    if (isInitialized && isAuthenticated && !user) {
-      console.warn('⚠️ Inconsistent auth state detected - user is authenticated but no user data')
-      // Tenter de forcer une re-hydratation
-      if (authState.initialize) {
-        console.log('🔄 Forcing auth re-initialization...')
-        authState.initialize()
-      }
+    if (isInitialized && isAuthenticated && !user && authState.initialize) {
+      authState.initialize()
     }
   }, [isInitialized, isAuthenticated, user, authState])
-
-  // Force comprehensive sync if needed
-  useEffect(() => {
-    const timeoutId = setTimeout(async () => {
-      // Si après 2 secondes l'état est toujours incohérent, forcer un sync complet
-      if (isInitialized && isAuthenticated && (!user || !user.email)) {
-        console.warn('🚨 Auth state still inconsistent after timeout - forcing comprehensive sync')
-        try {
-          const { AuthComprehensiveFix } = await import('@/core/state/stores/auth.fix.comprehensive')
-          await AuthComprehensiveFix.forceFullSync()
-        } catch (error) {
-          console.error('Failed to import comprehensive fix:', error)
-        }
-      }
-    }, 2000)
-
-    return () => clearTimeout(timeoutId)
-  }, [isInitialized, isAuthenticated, user])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -124,7 +88,7 @@ export const ProfileButton: React.FC<ProfileButtonProps> = ({
     try {
       await logout()
     } catch (error) {
-      console.error('Logout failed:', error)
+      logger.error('profile-button', 'Logout failed', { error })
     }
   }
 
@@ -134,7 +98,7 @@ export const ProfileButton: React.FC<ProfileButtonProps> = ({
       const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()
       return (
         <div className="w-8 h-8 rounded-full bg-trackbee-500 flex items-center justify-center text-white text-sm font-semibold">
-          {initials || (user.email ? user.email[0].toUpperCase() : '?')}
+          {initials || (user.email ? user.email?.charAt(0).toUpperCase() : '?')}
         </div>
       )
     }

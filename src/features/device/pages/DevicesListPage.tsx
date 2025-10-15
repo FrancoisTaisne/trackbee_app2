@@ -1,29 +1,32 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Devices List Page - Liste des dispositifs IoT
  * Affichage et gestion des dispositifs TrackBee
  */
 
 import React from 'react'
-import { Link } from 'react-router-dom'
-import { Plus, Search, Filter, Wifi, WifiOff, Loader2 } from 'lucide-react'
-import { cn } from '@/shared/utils/cn'
+import { Link, useNavigate } from 'react-router-dom'
+import { Plus, Search, Filter, Wifi, WifiOff, Loader2, Radar } from 'lucide-react'
+import { cn } from '@/core/utils/cn'
 import { useDeviceList } from '@/features/device/hooks/useDeviceList'
+import { DeviceScanModal } from '@/features/device/components/DeviceScanModal'
+import type { DeviceScanResult } from '@/features/device/types'
 
 const DevicesListPage: React.FC = () => {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = React.useState('')
   const [filter, setFilter] = React.useState<'all' | 'connected' | 'disconnected'>('all')
+  const [showScanModal, setShowScanModal] = React.useState(false)
 
   const { devices, isLoading, error } = useDeviceList()
 
   const filteredDevices = React.useMemo(() => {
-    return devices.filter(device => {
-      const matchesSearch = device.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           device.macD?.toLowerCase().includes(searchTerm.toLowerCase())
+    return devices.filter(bundle => {
+      const matchesSearch = bundle.machine.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           bundle.machine.macAddress?.toLowerCase().includes(searchTerm.toLowerCase())
 
       if (filter === 'all') return matchesSearch
-      if (filter === 'connected') return matchesSearch && device.connected
-      if (filter === 'disconnected') return matchesSearch && !device.connected
+      if (filter === 'connected') return matchesSearch && bundle.bleConnection?.status === 'connected'
+      if (filter === 'disconnected') return matchesSearch && bundle.bleConnection?.status !== 'connected'
 
       return matchesSearch
     })
@@ -44,17 +47,20 @@ const DevicesListPage: React.FC = () => {
                   Gérez vos dispositifs TrackBee
                 </p>
               </div>
-              <Link
-                to="/devices/scan"
-                className={cn(
-                  'inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg',
-                  'bg-trackbee-500 text-white hover:bg-trackbee-600',
-                  'transition-colors duration-200'
-                )}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Scanner dispositifs
-              </Link>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowScanModal(true)}
+                  className={cn(
+                    'inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg',
+                    'bg-trackbee-500 text-white hover:bg-trackbee-600',
+                    'transition-colors duration-200 shadow-sm hover:shadow-md'
+                  )}
+                >
+                  <Radar className="w-4 h-4 mr-2" />
+                  Scanner
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -85,7 +91,7 @@ const DevicesListPage: React.FC = () => {
               <Filter className="w-4 h-4 text-gray-400" />
               <select
                 value={filter}
-                onChange={(e) => setFilter(e.target.value as any)}
+                onChange={(e) => setFilter(e.target.value as 'disconnected' | 'connected' | 'all')}
                 className={cn(
                   'px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg',
                   'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100',
@@ -132,40 +138,29 @@ const DevicesListPage: React.FC = () => {
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
               {devices.length === 0 ? 'Aucun dispositif' : 'Aucun résultat'}
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-gray-600 dark:text-gray-400">
               {devices.length === 0
-                ? 'Commencez par scanner et connecter votre premier dispositif TrackBee'
+                ? 'Commencez par scanner et connecter votre premier dispositif TrackBee en cliquant sur le bouton "Scanner" ci-dessus'
                 : 'Essayez de modifier vos critères de recherche'
               }
             </p>
-            <Link
-              to="/devices/scan"
-              className={cn(
-                'inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg',
-                'bg-trackbee-500 text-white hover:bg-trackbee-600',
-                'transition-colors duration-200'
-              )}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Scanner dispositifs
-            </Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredDevices.map((device) => (
+            {filteredDevices.map((bundle) => (
               <Link
-                key={device.id}
-                to={`/devices/${device.id}`}
+                key={bundle.machine.id}
+                to={`/devices/${bundle.machine.id}`}
                 className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200"
               >
                 <div className="p-6">
                   {/* Device Header */}
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                      {device.name || `Device ${device.id}`}
+                      {bundle.machine.name || `Device ${bundle.machine.id}`}
                     </h3>
                     <div className="flex items-center">
-                      {device.connected ? (
+                      {bundle.bleConnection?.status === 'connected' ? (
                         <Wifi className="w-5 h-5 text-green-500" />
                       ) : (
                         <WifiOff className="w-5 h-5 text-gray-400" />
@@ -177,15 +172,15 @@ const DevicesListPage: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500 dark:text-gray-400">MAC:</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-mono">
-                        {device.macD || 'Non défini'}
+                      <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">
+                        {bundle.machine.macAddress || 'Non défini'}
                       </span>
                     </div>
 
                     <div className="flex justify-between">
                       <span className="text-gray-500 dark:text-gray-400">Site:</span>
                       <span className="text-gray-900 dark:text-gray-100">
-                        {device.installation?.site?.name || 'Non assigné'}
+                        {bundle.site?.name || 'Non assigné'}
                       </span>
                     </div>
 
@@ -193,34 +188,15 @@ const DevicesListPage: React.FC = () => {
                       <span className="text-gray-500 dark:text-gray-400">Statut:</span>
                       <span className={cn(
                         'px-2 py-1 text-xs rounded-full',
-                        device.connected
+                        bundle.bleConnection?.status === 'connected'
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                           : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                       )}>
-                        {device.connected ? 'Connecté' : 'Déconnecté'}
+                        {bundle.bleConnection?.status === 'connected' ? 'Connecté' : 'Déconnecté'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Battery Level */}
-                  {device.batteryLevel !== undefined && (
-                    <div className="mt-4">
-                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                        <span>Batterie</span>
-                        <span>{device.batteryLevel}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div
-                          className={cn(
-                            'h-2 rounded-full transition-all duration-300',
-                            device.batteryLevel > 50 ? 'bg-green-500' :
-                            device.batteryLevel > 20 ? 'bg-yellow-500' : 'bg-red-500'
-                          )}
-                          style={{ width: `${device.batteryLevel}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               </Link>
             ))}
@@ -236,12 +212,31 @@ const DevicesListPage: React.FC = () => {
                 {filteredDevices.length !== devices.length && ` sur ${devices.length} total`}
               </span>
               <span>
-                {devices.filter(d => d.connected).length} connecté{devices.filter(d => d.connected).length > 1 ? 's' : ''}
+                {devices.filter(b => b.bleConnection?.status === 'connected').length} connecté{devices.filter(b => b.bleConnection?.status === 'connected').length > 1 ? 's' : ''}
               </span>
             </div>
           </div>
         )}
       </div>
+
+      <DeviceScanModal
+        isOpen={showScanModal}
+        onClose={() => setShowScanModal(false)}
+        filterByKnownMacs={false}
+        autoConnect={false}
+        onDeviceSelected={(result: DeviceScanResult) => {
+          setShowScanModal(false)
+
+          // Naviguer vers la page de détail du device
+          if (result.machine?.id) {
+            navigate(`/devices/${result.machine.id}`)
+          } else {
+            // Si device inconnu, afficher un message ou rediriger vers création
+            console.warn('Device sélectionné non enregistré dans la base de données', result)
+            // TODO: Optionnellement rediriger vers une page de création de device
+          }
+        }}
+      />
     </div>
   )
 }

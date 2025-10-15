@@ -1,5 +1,4 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
+﻿/**
  * Campaign Scheduler Component
  * Interface de planification des campagnes avec vue calendrier et timeline
  */
@@ -7,17 +6,15 @@
 import React, { useState, useMemo } from 'react'
 import {
   Calendar, Clock, Play, ChevronLeft, ChevronRight,
-  Filter, Grid, List, AlertTriangle, Info
+  Grid, List, LineChart, AlertTriangle
 } from 'lucide-react'
 import { logger } from '@/core/utils/logger'
 import { useCampaignScheduler, groupEventsByDate, getUpcomingEventsForToday, getUpcomingEventsForWeek } from '../hooks'
 import type {
   CampaignSchedulerProps, ScheduledEvent
 } from '../types'
-import type { Campaign } from '@/core/types/domain'
-import { CAMPAIGN_TYPES, CAMPAIGN_STATUS_LABELS } from '../types'
 
-const log = logger
+const log = logger.extend('campaign')
 
 export function CampaignScheduler({
   siteId,
@@ -29,7 +26,7 @@ export function CampaignScheduler({
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [currentView, setCurrentView] = useState(view)
 
-  // Calculer la plage de dates pour la requête
+  // Calculer la plage de dates pour la requÃªte
   const dateRange = useMemo(() => {
     const start = new Date(selectedDate)
     start.setDate(1) // Premier jour du mois
@@ -78,7 +75,7 @@ export function CampaignScheduler({
           onClick={() => refetch()}
           className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200"
         >
-          Réessayer
+          RÃ©essayer
         </button>
       </div>
     )
@@ -86,7 +83,7 @@ export function CampaignScheduler({
 
   return (
     <div className={`campaign-scheduler ${className}`}>
-      {/* En-tête avec navigation */}
+      {/* En-tÃªte avec navigation */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-semibold text-gray-900">Planification</h2>
@@ -115,7 +112,7 @@ export function CampaignScheduler({
           </div>
         </div>
 
-        {/* Sélecteur de vue */}
+        {/* SÃ©lecteur de vue */}
         <div className="flex items-center bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setCurrentView('calendar')}
@@ -147,13 +144,13 @@ export function CampaignScheduler({
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <Timeline className="w-4 h-4 mr-1 inline" />
+            <LineChart className="w-4 h-4 mr-1 inline" />
             Timeline
           </button>
         </div>
       </div>
 
-      {/* Résumé rapide */}
+      {/* RÃ©sumÃ© rapide */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
@@ -255,17 +252,16 @@ interface CalendarViewProps {
 function CalendarView({ events, selectedDate, onEventClick, onDateSelect }: CalendarViewProps) {
   const eventsByDate = useMemo(() => groupEventsByDate(events), [events])
 
-  // Générer les jours du calendrier
+  // GÃ©nÃ©rer les jours du calendrier
   const calendarDays = useMemo(() => {
     const year = selectedDate.getFullYear()
     const month = selectedDate.getMonth()
     const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
     const startDate = new Date(firstDay)
     startDate.setDate(startDate.getDate() - firstDay.getDay()) // Commencer le dimanche
 
     const days = []
-    for (let i = 0; i < 42; i++) { // 6 semaines × 7 jours
+    for (let i = 0; i < 42; i++) { // 6 semaines Ã— 7 jours
       const date = new Date(startDate)
       date.setDate(startDate.getDate() + i)
       days.push(date)
@@ -275,7 +271,7 @@ function CalendarView({ events, selectedDate, onEventClick, onDateSelect }: Cale
 
   return (
     <div className="p-6">
-      {/* En-tête des jours de la semaine */}
+      {/* En-tÃªte des jours de la semaine */}
       <div className="grid grid-cols-7 gap-1 mb-4">
         {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(day => (
           <div key={day} className="py-2 text-center text-sm font-medium text-gray-500">
@@ -287,8 +283,8 @@ function CalendarView({ events, selectedDate, onEventClick, onDateSelect }: Cale
       {/* Grille du calendrier */}
       <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((date, index) => {
-          const dateKey = date.toISOString().split('T')[0]
-          const dayEvents = eventsByDate[dateKey] || []
+          const [dateKey] = date.toISOString().split('T')
+          const dayEvents: ScheduledEvent[] = dateKey ? eventsByDate[dateKey] ?? [] : []
           const isCurrentMonth = date.getMonth() === selectedDate.getMonth()
           const isToday = date.toDateString() === new Date().toDateString()
 
@@ -317,7 +313,7 @@ function CalendarView({ events, selectedDate, onEventClick, onDateSelect }: Cale
                     className={`px-1 py-0.5 text-xs rounded truncate cursor-pointer ${
                       getEventColorClass(event.status)
                     }`}
-                    title={`${event.campaignName} - ${new Date(event.scheduledAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                    title={event.scheduledAt ? `${event.campaignName} - ${new Date(event.scheduledAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : event.campaignName}
                   >
                     {event.campaignName}
                   </div>
@@ -361,7 +357,7 @@ function ListView({ events, onEventClick }: ListViewProps) {
           </h3>
 
           <div className="space-y-3">
-            {eventsByDate[date].map(event => (
+            {(eventsByDate[date] ?? []).map(event => (
               <EventCard
                 key={event.id}
                 event={event}
@@ -375,8 +371,8 @@ function ListView({ events, onEventClick }: ListViewProps) {
       {sortedDates.length === 0 && (
         <div className="p-12 text-center">
           <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun événement planifié</h3>
-          <p className="text-gray-500">Créez une campagne pour voir les événements ici</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun Ã©vÃ©nement planifiÃ©</h3>
+          <p className="text-gray-500">CrÃ©ez une campagne pour voir les Ã©vÃ©nements ici</p>
         </div>
       )}
     </div>
@@ -392,7 +388,7 @@ interface TimelineViewProps {
 }
 
 function TimelineView({ events, selectedDate, onEventClick }: TimelineViewProps) {
-  // Filtrer les événements de la semaine sélectionnée
+  // Filtrer les Ã©vÃ©nements de la semaine sÃ©lectionnÃ©e
   const weekEvents = useMemo(() => {
     const startOfWeek = new Date(selectedDate)
     startOfWeek.setDate(selectedDate.getDate() - selectedDate.getDay())
@@ -410,7 +406,7 @@ function TimelineView({ events, selectedDate, onEventClick }: TimelineViewProps)
   return (
     <div className="p-6 overflow-x-auto">
       <div className="min-w-full">
-        {/* En-tête des jours */}
+        {/* En-tÃªte des jours */}
         <div className="grid grid-cols-8 gap-1 mb-4">
           <div className="text-sm font-medium text-gray-500 py-2">Heure</div>
           {['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(day => (
@@ -450,7 +446,7 @@ function TimelineView({ events, selectedDate, onEventClick }: TimelineViewProps)
                         className={`absolute inset-1 px-1 py-0.5 text-xs rounded cursor-pointer ${
                           getEventColorClass(event.status)
                         }`}
-                        title={`${event.campaignName} - ${new Date(event.scheduledAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                        title={event.scheduledAt ? `${event.campaignName} - ${new Date(event.scheduledAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : event.campaignName}
                       >
                         <div className="truncate">{event.campaignName}</div>
                       </div>
@@ -506,7 +502,7 @@ function EventCard({ event, onClick }: EventCardProps) {
         {event.duration_s && (
           <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Durée: {Math.floor(event.duration_s / 60)}min
+            DurÃ©e: {Math.floor(event.duration_s / 60)}min
           </div>
         )}
       </div>
@@ -532,3 +528,8 @@ function getEventColorClass(status: string): string {
       return 'bg-gray-100 text-gray-800 hover:bg-gray-200'
   }
 }
+
+
+
+
+

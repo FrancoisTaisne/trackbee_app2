@@ -104,48 +104,73 @@ const SitesListPage: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sites.map((site: any) => (
-                  <div
-                    key={site.id}
-                    className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200"
-                  >
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {site.name}
-                        </h3>
-                        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          {site.statistics?.totalInstallations || 0}
+                {sites.map((bundle) => {
+                  const site = bundle.site
+                  if (!site) {
+                    return null
+                  }
+
+                  const key = site.id ?? site.name
+                  const coordinates = site.lat && site.lng ? { latitude: site.lat, longitude: site.lng } : undefined
+                  const stats = bundle.statistics ?? {
+                    totalInstallations: 0,
+                    activeInstallations: 0,
+                    totalMachines: 0,
+                    connectedMachines: 0,
+                    totalCampaigns: 0,
+                    activeCampaigns: 0,
+                    completedCalculations: 0,
+                    failedCalculations: 0
+                  }
+                  const detailPath = site.id != null ? `/sites/${site.id}` : null
+
+                  return (
+                    <div
+                      key={key}
+                      className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow duration-200"
+                    >
+                      <div className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            {site.name}
+                          </h3>
+                          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            {stats.totalInstallations || 0}
+                          </div>
                         </div>
-                      </div>
 
-                      {site.description && (
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
-                          {site.description}
-                        </p>
-                      )}
+                        {site.description && (
+                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-4 line-clamp-2">
+                            {site.description}
+                          </p>
+                        )}
 
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="text-gray-500 dark:text-gray-400">
-                          {site.coordinates?.latitude && site.coordinates?.longitude ? (
-                            <>
-                              {site.coordinates.latitude.toFixed(6)}, {site.coordinates.longitude.toFixed(6)}
-                            </>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="text-gray-500 dark:text-gray-400">
+                            {coordinates?.latitude != null && coordinates?.longitude != null ? (
+                              <>
+                                {coordinates.latitude.toFixed(6)}, {coordinates.longitude.toFixed(6)}
+                              </>
+                            ) : (
+                              'Coordonnées non définies'
+                            )}
+                          </div>
+                          {detailPath ? (
+                            <Link
+                              to={detailPath}
+                              className="text-trackbee-600 hover:text-trackbee-700 font-medium"
+                            >
+                              Voir détails
+                            </Link>
                           ) : (
-                            'Coordonnées non définies'
+                            <span className="text-gray-400">Détails indisponibles</span>
                           )}
                         </div>
-                        <Link
-                          to={`/sites/${site.id}`}
-                          className="text-trackbee-600 hover:text-trackbee-700 font-medium"
-                        >
-                          Voir détails
-                        </Link>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </>

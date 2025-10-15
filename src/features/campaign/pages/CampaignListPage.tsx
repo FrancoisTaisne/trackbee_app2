@@ -1,36 +1,43 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
- * Campaign List Page
- * Page de gestion des campagnes avec liste, filtres et planification
+ * Campaign List Page - nouvelle mise en page
  */
 
-import React, { useState } from 'react'
+import React, { useMemo } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Calendar, Filter, Plus, LayoutGrid, List } from 'lucide-react'
-import { PageLayout } from '@/shared/ui/components/Layout/PageLayout'
+import { Calendar, List } from 'lucide-react'
+import {
+  AppLayout,
+  PageHeader,
+  Section,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  Breadcrumb
+} from '@/shared/ui/components'
 import { CampaignList, CampaignScheduler } from '../components'
 import type { Campaign, ScheduledEvent, CreateCampaignData } from '../types'
 
-export function CampaignListPage() {
+type CampaignTab = 'list' | 'scheduler'
+
+export function CampaignListPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  const [activeTab, setActiveTab] = useState<'list' | 'scheduler'>(
-    searchParams.get('tab') as 'list' | 'scheduler' || 'list'
-  )
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null)
+  const activeTab: CampaignTab = useMemo(() => {
+    const param = searchParams.get('tab')
+    return param === 'scheduler' ? 'scheduler' : 'list'
+  }, [searchParams])
 
-  // Récupérer les paramètres de filtrage depuis l'URL
   const siteId = searchParams.get('siteId') ? Number(searchParams.get('siteId')) : undefined
   const machineId = searchParams.get('machineId') ? Number(searchParams.get('machineId')) : undefined
   const installationId = searchParams.get('installationId') ? Number(searchParams.get('installationId')) : undefined
 
-  const handleTabChange = (tab: 'list' | 'scheduler') => {
-    setActiveTab(tab)
+  const updateTab = (tab: CampaignTab) => {
     setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev)
-      newParams.set('tab', tab)
-      return newParams
+      const next = new URLSearchParams(prev)
+      next.set('tab', tab)
+      return next
     })
   }
 
@@ -38,53 +45,42 @@ export function CampaignListPage() {
     navigate(`/campaigns/${campaign.id}`)
   }
 
+  const handleCampaignCreate = (_data: CreateCampaignData) => {
+    // Les mutations sont gérées dans la liste, rien à faire ici pour le moment.
+  }
+
   const handleEventSelect = (event: ScheduledEvent) => {
     navigate(`/campaigns/${event.campaignId}`)
   }
 
-  const handleCampaignCreate = (data: CreateCampaignData) => {
-    // La création est gérée par le composant CampaignList
-    // Ici on peut ajouter de la logique supplémentaire si nécessaire
-  }
-
   return (
-    <PageLayout
-      title="Campagnes GNSS"
-      subtitle="Gérez vos campagnes de mesure et leur planification"
-    >
-      <div className="space-y-6">
-        {/* Navigation des onglets */}
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => handleTabChange('list')}
-              className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'list'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
+    <AppLayout title="Campagnes GNSS">
+      <PageHeader
+        title="Campagnes GNSS"
+        description="Gérez vos campagnes de mesure et planifiez vos opérations GNSS."
+        breadcrumb={(
+          <Breadcrumb
+            items={[
+              { label: 'Campagnes', current: true }
+            ]}
+          />
+        )}
+      />
+
+      <Section>
+        <Tabs value={activeTab} onValueChange={tab => updateTab(tab as CampaignTab)}>
+          <TabsList className="grid grid-cols-2 w-full md:w-auto">
+            <TabsTrigger value="list" className="flex items-center gap-2">
               <List className="w-4 h-4" />
               Liste des campagnes
-            </button>
-
-            <button
-              onClick={() => handleTabChange('scheduler')}
-              className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'scheduler'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
+            </TabsTrigger>
+            <TabsTrigger value="scheduler" className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Planification
-            </button>
-          </nav>
-        </div>
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Contenu selon l'onglet actif */}
-        <div className="tab-content">
-          {activeTab === 'list' && (
+          <TabsContent value="list" className="mt-6">
             <CampaignList
               siteId={siteId}
               machineId={machineId}
@@ -92,31 +88,27 @@ export function CampaignListPage() {
               onCampaignSelect={handleCampaignSelect}
               onCampaignCreate={handleCampaignCreate}
             />
-          )}
+          </TabsContent>
 
-          {activeTab === 'scheduler' && (
+          <TabsContent value="scheduler" className="mt-6">
             <CampaignScheduler
               siteId={siteId}
               machineId={machineId}
               onEventSelect={handleEventSelect}
               view="calendar"
             />
-          )}
-        </div>
-      </div>
-    </PageLayout>
+          </TabsContent>
+        </Tabs>
+      </Section>
+    </AppLayout>
   )
 }
-
-// ==================== BREADCRUMB CONFIG ====================
 
 export const CampaignListPageBreadcrumb = {
   path: '/campaigns',
   label: 'Campagnes',
   parent: null
 }
-
-// ==================== ROUTE CONFIG ====================
 
 export const CampaignListPageRoute = {
   path: '/campaigns',
@@ -125,3 +117,5 @@ export const CampaignListPageRoute = {
   requireAuth: true,
   permissions: ['campaigns:read']
 }
+
+export default CampaignListPage

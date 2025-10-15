@@ -11,7 +11,6 @@ import {
   ZoomOut,
   RotateCcw,
   Layers,
-  Crosshair,
   Search
 } from 'lucide-react'
 import {
@@ -26,8 +25,7 @@ import { cn } from '@/core/utils/cn'
 import type {
   SiteMapProps,
   SiteBundle,
-  MapPosition,
-  MapBounds
+  MapPosition
 } from '../types'
 
 // ==================== LOGGER SETUP ====================

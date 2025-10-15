@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react'
 import { User, Lock, Mail, UserPlus, LogIn } from 'lucide-react'
-import { Modal, Button, Input, Badge } from '@/shared/ui/components'
+import { Modal, Button, Input } from '@/shared/ui/components'
 import { useAuth } from '@/core/state/stores/auth.store'
 import { logger } from '@/core/utils/logger'
 import type { LoginModalProps, AuthMode, LoginCredentials, RegisterData } from '../types'
@@ -248,7 +248,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   showCloseButton = true
 }) => {
   const [mode, setMode] = useState<AuthMode>(defaultMode)
-  const { login, register, isLoading, error, clearError } = useAuth()
+  const { login, register, isLoading, loginError, clearError, user, token } = useAuth()
 
   // Reset mode when modal opens/closes
   React.useEffect(() => {
@@ -262,7 +262,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     try {
       const session = await login(credentials)
       authLog.info('Login successful via modal')
-      onLoginSuccess?.(session)
+      // Construire une AuthSession pour le callback à partir de l'état courant
+      const authSession = {
+        token: token!,
+        user: user!,
+        expiresAt: session.expiresAt.toISOString(),
+        refreshToken: session.refreshToken
+      }
+      onLoginSuccess?.(authSession)
       onClose()
     } catch (error) {
       authLog.error('Login failed via modal', error)
@@ -274,7 +281,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     try {
       const session = await register(data)
       authLog.info('Registration successful via modal')
-      onLoginSuccess?.(session)
+      const authSession = {
+        token: token!,
+        user: user!,
+        expiresAt: session.expiresAt.toISOString(),
+        refreshToken: session.refreshToken
+      }
+      onLoginSuccess?.(authSession)
       onClose()
     } catch (error) {
       authLog.error('Registration failed via modal', error)
@@ -338,13 +351,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <LoginForm
             onSubmit={handleLogin}
             loading={isLoading}
-            error={error}
+            error={loginError}
           />
         ) : (
           <RegisterForm
             onSubmit={handleRegister}
             loading={isLoading}
-            error={error}
+            error={loginError}
           />
         )}
       </div>

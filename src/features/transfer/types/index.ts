@@ -186,6 +186,12 @@ export interface WiFiDeviceInfo extends DeviceInfo {
   latency?: number        // ping en ms
 }
 
+export interface WiFiConnectionTestResult {
+  isReachable: boolean
+  latency?: number
+  error?: string
+}
+
 // ==================== OFFLINE QUEUE TYPES ====================
 
 export interface OfflineQueue {
@@ -222,7 +228,7 @@ export interface OfflineTransfer extends Transfer {
   syncAttempts: number
   lastSyncAttempt?: string
   syncError?: string
-  persistedData?: any     // Données sérialisées
+  persistedData?: unknown     // Données sérialisées
 }
 
 // ==================== FORM TYPES ====================
@@ -351,6 +357,7 @@ export interface UseBLETransferReturn {
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error'
   lastError?: Error
 
+  testConnection: (ipAddress: string, port?: number) => Promise<WiFiConnectionTestResult>
   refetch: () => Promise<void>
 }
 
@@ -629,7 +636,7 @@ export interface TransferError extends Error {
         'BLE_ERROR' | 'WIFI_ERROR' | 'QUEUE_FULL' | 'PERMISSION_DENIED'
   transferId?: TransferId
   deviceId?: string
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 }
 
 // ==================== QUERY KEYS ====================

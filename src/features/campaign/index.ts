@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Campaign Feature Export Index
  * Point d'entrée centralisé pour toute la feature de gestion des campagnes GNSS
@@ -27,8 +26,7 @@ export {
   groupEventsByDate,
   isEventConflicting,
   findConflictingEvents,
-  formatRecurrenceDescription,
-  campaignQueryKeys
+  formatRecurrenceDescription
 } from './hooks'
 
 // ==================== COMPONENTS ====================
@@ -52,6 +50,8 @@ export {
 // ==================== TYPES ====================
 export type {
   Campaign,
+  CampaignId,
+  CalculationId,
   CampaignBundle,
   CampaignStatistics,
   CreateCampaignData,
@@ -62,7 +62,6 @@ export type {
   RecurrenceOptions,
   ScheduledEvent,
   CampaignFile,
-  Calculation,
   UseCampaignReturn,
   UseCampaignListReturn,
   UseCampaignSchedulerReturn,
@@ -85,7 +84,8 @@ export {
   CreateCampaignSchema,
   UpdateCampaignSchema,
   CampaignFiltersSchema,
-  RecurrenceOptionsSchema
+  RecurrenceOptionsSchema,
+  campaignQueryKeys
 } from './types'
 
 // ==================== FEATURE INFO ====================

@@ -10,106 +10,106 @@ import { cn } from '@/shared/utils/cn'
 // ==================== VARIANTS ====================
 
 const badgeVariants = cva(
-  // Classes de base
+  // Classes de base - Style professionnel compact
   [
-    'inline-flex items-center font-medium transition-colors duration-200',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2'
+    'inline-flex items-center font-medium transition-colors duration-150',
+    'focus:outline-none focus:ring-1 focus:ring-offset-0'
   ],
   {
     variants: {
       variant: {
-        // Badge par défaut
+        // Badge par défaut - minimaliste
         default: [
-          'bg-gray-100 text-gray-800 border border-gray-200',
-          'hover:bg-gray-200',
-          'dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600',
-          'dark:hover:bg-gray-600'
+          'bg-gray-100 text-gray-700 border border-gray-200',
+          'hover:bg-gray-150',
+          'dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700',
+          'dark:hover:bg-gray-750'
         ],
 
-        // Badge primary
+        // Badge primary - sobre
         primary: [
-          'bg-trackbee-100 text-trackbee-800 border border-trackbee-200',
-          'hover:bg-trackbee-200',
-          'dark:bg-trackbee-900/30 dark:text-trackbee-300 dark:border-trackbee-800',
-          'dark:hover:bg-trackbee-900/50'
+          'bg-trackbee-50 text-trackbee-700 border border-trackbee-200',
+          'hover:bg-trackbee-100',
+          'dark:bg-trackbee-900/20 dark:text-trackbee-300 dark:border-trackbee-800',
+          'dark:hover:bg-trackbee-900/30'
         ],
 
-        // Badge secondary
+        // Badge secondary - discret
         secondary: [
           'bg-gray-50 text-gray-600 border border-gray-200',
           'hover:bg-gray-100',
-          'dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
-          'dark:hover:bg-gray-700'
+          'dark:bg-gray-850 dark:text-gray-400 dark:border-gray-750',
+          'dark:hover:bg-gray-800'
         ],
 
-        // Badge success
+        // Badge success - subtil
         success: [
-          'bg-success-100 text-success-800 border border-success-200',
-          'hover:bg-success-200',
-          'dark:bg-success-900/30 dark:text-success-300 dark:border-success-800',
-          'dark:hover:bg-success-900/50'
+          'bg-success-50 text-success-700 border border-success-200',
+          'hover:bg-success-100',
+          'dark:bg-success-900/20 dark:text-success-300 dark:border-success-800',
+          'dark:hover:bg-success-900/30'
         ],
 
-        // Badge warning
+        // Badge warning - discret
         warning: [
-          'bg-warning-100 text-warning-800 border border-warning-200',
-          'hover:bg-warning-200',
-          'dark:bg-warning-900/30 dark:text-warning-300 dark:border-warning-800',
-          'dark:hover:bg-warning-900/50'
+          'bg-warning-50 text-warning-700 border border-warning-200',
+          'hover:bg-warning-100',
+          'dark:bg-warning-900/20 dark:text-warning-300 dark:border-warning-800',
+          'dark:hover:bg-warning-900/30'
         ],
 
-        // Badge danger
+        // Badge danger - subtil
         danger: [
-          'bg-danger-100 text-danger-800 border border-danger-200',
-          'hover:bg-danger-200',
-          'dark:bg-danger-900/30 dark:text-danger-300 dark:border-danger-800',
-          'dark:hover:bg-danger-900/50'
+          'bg-danger-50 text-danger-700 border border-danger-200',
+          'hover:bg-danger-100',
+          'dark:bg-danger-900/20 dark:text-danger-300 dark:border-danger-800',
+          'dark:hover:bg-danger-900/30'
         ],
 
-        // Badge info
+        // Badge info - discret
         info: [
-          'bg-blue-100 text-blue-800 border border-blue-200',
-          'hover:bg-blue-200',
-          'dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
-          'dark:hover:bg-blue-900/50'
+          'bg-blue-50 text-blue-700 border border-blue-200',
+          'hover:bg-blue-100',
+          'dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800',
+          'dark:hover:bg-blue-900/30'
         ],
 
-        // Badge solid variants
+        // Badge solid variants - compact
         'solid-primary': [
-          'bg-trackbee-500 text-white border border-trackbee-500',
-          'hover:bg-trackbee-600 hover:border-trackbee-600'
+          'bg-trackbee-600 text-white border border-trackbee-600',
+          'hover:bg-trackbee-700 hover:border-trackbee-700'
         ],
 
         'solid-success': [
-          'bg-success-500 text-white border border-success-500',
-          'hover:bg-success-600 hover:border-success-600'
+          'bg-success-600 text-white border border-success-600',
+          'hover:bg-success-700 hover:border-success-700'
         ],
 
         'solid-warning': [
-          'bg-warning-500 text-white border border-warning-500',
-          'hover:bg-warning-600 hover:border-warning-600'
+          'bg-warning-600 text-white border border-warning-600',
+          'hover:bg-warning-700 hover:border-warning-700'
         ],
 
         'solid-danger': [
-          'bg-danger-500 text-white border border-danger-500',
-          'hover:bg-danger-600 hover:border-danger-600'
+          'bg-danger-600 text-white border border-danger-600',
+          'hover:bg-danger-700 hover:border-danger-700'
         ],
 
-        // Badge outline
+        // Badge outline - fin
         outline: [
-          'bg-transparent text-gray-700 border border-gray-300',
-          'hover:bg-gray-50',
-          'dark:text-gray-300 dark:border-gray-600',
-          'dark:hover:bg-gray-800'
+          'bg-transparent text-gray-600 border border-gray-300',
+          'hover:bg-gray-50/50',
+          'dark:text-gray-400 dark:border-gray-700',
+          'dark:hover:bg-gray-850'
         ]
       },
 
       size: {
-        xs: 'px-2 py-0.5 text-xs rounded',
-        sm: 'px-2.5 py-0.5 text-xs rounded-md',
-        md: 'px-3 py-1 text-sm rounded-md',
-        lg: 'px-3.5 py-1.5 text-sm rounded-lg',
-        xl: 'px-4 py-2 text-base rounded-lg'
+        xs: 'px-1.5 py-0.5 text-[10px] rounded-sm',
+        sm: 'px-2 py-0.5 text-[11px] rounded',
+        md: 'px-2.5 py-0.5 text-xs rounded',
+        lg: 'px-3 py-1 text-xs rounded',
+        xl: 'px-3.5 py-1 text-sm rounded'
       },
 
       dot: {
@@ -217,14 +217,14 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
         {/* Point coloré */}
         {dot && (
           <span
-            className="w-2 h-2 bg-current rounded-full mr-2 flex-shrink-0"
+            className="w-1.5 h-1.5 bg-current rounded-full mr-1.5 flex-shrink-0"
             style={dotColor ? { backgroundColor: dotColor } : undefined}
           />
         )}
 
         {/* Icône gauche */}
         {leftIcon && (
-          <span className="mr-1.5 flex-shrink-0">
+          <span className="mr-1 flex-shrink-0">
             {leftIcon}
           </span>
         )}
@@ -236,7 +236,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
 
         {/* Icône droite */}
         {rightIcon && (
-          <span className="ml-1.5 flex-shrink-0">
+          <span className="ml-1 flex-shrink-0">
             {rightIcon}
           </span>
         )}
@@ -249,9 +249,9 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
               e.stopPropagation()
               onRemove()
             }}
-            className="ml-1.5 flex-shrink-0 rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5 transition-colors"
+            className="ml-1 flex-shrink-0 rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5 transition-colors"
           >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

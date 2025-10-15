@@ -4,6 +4,14 @@ import { storageManager } from '@/core/services/storage/StorageManager'
 import { database } from '@/core/database/schema'
 import { getSiteRepository } from '@/core/repositories/SiteRepository'
 import { getInstallationRepository } from '@/core/repositories/InstallationRepository'
+import type {
+  DatabaseMachine,
+  DatabaseSite,
+  DatabaseInstallation,
+  DatabaseCampaign,
+  DatabaseCalculation
+} from '@/core/database/schema'
+import type { CampaignStatus, CampaignType, CalculationStatus } from '@/core/types/domain'
 import { logger } from '@/core/utils/logger'
 
 const HYDRATION_ENDPOINT = '/api/me/hydrate?includeCampaigns=1&includeCalculations=1'
@@ -69,7 +77,7 @@ export interface HydrationCampaign {
   installationId?: number
   name: string
   description?: string
-  type: 'static_simple' | 'static_multiple' | 'kinematic'
+  type: 'static_simple' | 'static_multiple' | 'kinematic' | 'rover_base'
   status: string
   scheduledAt?: string
 }
@@ -81,7 +89,7 @@ export interface HydrationCalculation {
   machineId?: number
   installationId?: number
   status: string
-  type: 'static_simple' | 'static_multiple' | 'kinematic'
+  type: 'static_simple' | 'static_multiple' | 'kinematic' | 'rover_base'
 }
 
 export interface HydrationData {
@@ -209,8 +217,8 @@ export const HydrationService = {
   },
 
   async clearCache(): Promise<void> {
-    await storageManager.removeWithFallback(HYDRATION_CACHE_KEY)
-    await storageManager.removeWithFallback(HYDRATION_ETAG_KEY)
+    await storageManager.remove(HYDRATION_CACHE_KEY)
+    await storageManager.remove(HYDRATION_ETAG_KEY)
   }
 }
 
@@ -224,8 +232,15 @@ function normalizeMachines(rawMachines: Array<Record<string, any>>): {
   for (const raw of rawMachines) {
     if (!raw) continue
     const id = toNumber(raw.id)
-    const macAddress = raw.macD || raw.macd || raw.macAddress
-    if (!Number.isFinite(id) || !macAddress) continue
+    if (typeof id !== 'number') continue
+
+    const macAddressValue = raw.macD ?? raw.macd ?? raw.macAddress
+    const macAddress = typeof macAddressValue === 'string'
+      ? macAddressValue
+      : macAddressValue != null
+        ? String(macAddressValue)
+        : undefined
+    if (!macAddress) continue
 
     const isActive = raw.status === true || raw.status === 'ACTIVE'
     const installation = raw.installation ? normalizeInstallation(raw.installation, raw.installation.machineId ?? id) : undefined
@@ -237,7 +252,7 @@ function normalizeMachines(rawMachines: Array<Record<string, any>>): {
       macAddress,
       description: raw.description || undefined,
       model: raw.model || undefined,
-      type: raw.type || 'trackbee',
+      type: normalizeMachineType(raw.type),
       isActive,
       lastSeenAt: toIso(raw.lastSeenAt),
       installation
@@ -261,7 +276,7 @@ function normalizeSites(rawSites?: {
 
   const processSite = (siteRaw: Record<string, any>, ownership: 'owner' | 'shared', sharedRole?: 'viewer' | 'editor') => {
     const id = toNumber(siteRaw?.id)
-    if (!Number.isFinite(id)) return
+    if (typeof id !== 'number') return
 
     if (!siteMap.has(id)) {
       siteMap.set(id, {
@@ -299,7 +314,7 @@ function normalizeCampaigns(rawCampaigns: Array<Record<string, any>>): Hydration
   return rawCampaigns
     .map(c => {
       const id = toNumber(c.id)
-      if (!Number.isFinite(id)) return null
+      if (typeof id !== 'number') return null
       return {
         id,
         siteId: toNumber(c.siteId),
@@ -319,7 +334,7 @@ function normalizeCalculations(rawCalcs: Array<Record<string, any>>): HydrationC
   return rawCalcs
     .map(calc => {
       const id = toNumber(calc.id)
-      if (!Number.isFinite(id)) return null
+      if (typeof id !== 'number') return null
       return {
         id,
         campaignId: toNumber(calc.campaignId),
@@ -353,12 +368,13 @@ function toDatabaseMachine(machine: HydrationMachine) {
     name: machine.name,
     description: machine.description,
     macAddress: machine.macAddress,
+    macD: machine.macAddress,
     model: machine.model,
-    type: machine.type,
+    type: normalizeMachineType(machine.type),
     isActive: machine.isActive,
     lastSeenAt: toDate(machine.lastSeenAt),
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     syncedAt: new Date()
   }
 }
@@ -393,7 +409,7 @@ function toDatabaseInstallation(installation: HydrationInstallation) {
     positionIndex: installation.positionIndex,
     installedAt: toDate(installation.installedAt) ?? new Date(),
     uninstalledAt: toDate(installation.uninstalledAt),
-    isActive: installation.isActive,
+    isActive: Boolean(installation.isActive),
     lastActivity: new Date(),
     syncedAt: new Date()
   }
@@ -407,8 +423,8 @@ function toDatabaseCampaign(campaign: HydrationCampaign) {
     installationId: campaign.installationId ?? 0,
     name: campaign.name,
     description: campaign.description,
-    type: campaign.type,
-    status: campaign.status,
+    type: normalizeCampaignType(campaign.type),
+    status: normalizeCampaignStatus(campaign.status),
     priority: 5,
     tags: [],
     scheduledAt: campaign.scheduledAt ? toDate(campaign.scheduledAt) : undefined,
@@ -427,22 +443,22 @@ function toDatabaseCalculation(calculation: HydrationCalculation) {
     siteId: calculation.siteId ?? 0,
     machineId: calculation.machineId ?? 0,
     installationId: calculation.installationId ?? 0,
-    status: calculation.status,
-    type: calculation.type,
+    status: normalizeCalculationStatus(calculation.status),
+    type: normalizeCampaignType(calculation.type),
     createdAt: new Date(),
     updatedAt: new Date(),
     syncedAt: new Date()
   }
 }
 
-function fromDatabaseMachine(machine: any): HydrationMachine {
+function fromDatabaseMachine(machine: DatabaseMachine): HydrationMachine {
   return {
     id: machine.id,
     name: machine.name,
-    macAddress: machine.macAddress,
+    macAddress: machine.macAddress ?? machine.macD,
     description: machine.description,
     model: machine.model,
-    type: machine.type || 'trackbee',
+    type: machine.type ?? 'trackbee',
     isActive: machine.isActive,
     lastSeenAt: machine.lastSeenAt?.toISOString()
   }
@@ -475,37 +491,85 @@ function fromDatabaseInstallation(installation: any): HydrationInstallation {
   }
 }
 
-function fromDatabaseCampaign(campaign: any): HydrationCampaign {
+function fromDatabaseCampaign(campaign: DatabaseCampaign): HydrationCampaign {
   return {
     id: campaign.id,
     siteId: campaign.siteId,
     machineId: campaign.machineId,
     installationId: campaign.installationId,
-    name: campaign.name,
+    name: campaign.name ?? `Campaign ${campaign.id}`,
     description: campaign.description,
     type: normalizeCampaignType(campaign.type || 'static_multiple'),
-    status: campaign.status,
-    scheduledAt: campaign.scheduledAt?.toISOString()
+    status: normalizeCampaignStatus(campaign.status),
+    scheduledAt: campaign.scheduledAt instanceof Date ? campaign.scheduledAt.toISOString() : campaign.scheduledAt
   }
 }
 
-function fromDatabaseCalculation(calculation: any): HydrationCalculation {
+function fromDatabaseCalculation(calculation: DatabaseCalculation): HydrationCalculation {
   return {
     id: calculation.id,
     campaignId: calculation.campaignId,
     siteId: calculation.siteId,
     machineId: calculation.machineId,
     installationId: calculation.installationId,
-    status: calculation.status,
+    status: normalizeCalculationStatus(calculation.status),
     type: normalizeCampaignType(calculation.type || 'static_multiple')
   }
 }
 
-function normalizeCampaignType(type: string): 'static_simple' | 'static_multiple' | 'kinematic' {
-  const value = (type || '').toLowerCase()
-  if (value.includes('kinematic')) return 'kinematic'
-  if (value.includes('static') && value.includes('simple')) return 'static_simple'
+type MachineTypeValue = 'trackbee' | 'trackbee_pro' | 'custom'
+const allowedMachineTypes: MachineTypeValue[] = ['trackbee', 'trackbee_pro', 'custom']
+const allowedCampaignStatuses: CampaignStatus[] = ['draft', 'active', 'paused', 'done', 'canceled']
+const allowedCampaignTypes: CampaignType[] = ['static_simple', 'static_multiple', 'kinematic', 'rover_base']
+const allowedCalculationStatuses: CalculationStatus[] = ['queued', 'running', 'done', 'failed', 'pending', 'completed']
+
+function normalizeMachineType(type?: string): MachineTypeValue {
+  if (type) {
+    const normalized = type.toLowerCase().replace('-', '_')
+    if (allowedMachineTypes.includes(normalized as MachineTypeValue)) {
+      return normalized as MachineTypeValue
+    }
+  }
+  return 'trackbee'
+}
+
+function normalizeCampaignType(type?: string): CampaignType {
+  if (type && allowedCampaignTypes.includes(type as CampaignType)) {
+    return type as CampaignType
+  }
+
+  const normalized = type?.toLowerCase() ?? ''
+  if (normalized.includes('rover')) return 'rover_base'
+  if (normalized.includes('kinematic')) return 'kinematic'
+  if (normalized.includes('simple')) return 'static_simple'
   return 'static_multiple'
+}
+
+function normalizeCampaignStatus(status?: string): CampaignStatus {
+  if (status && allowedCampaignStatuses.includes(status as CampaignStatus)) {
+    return status as CampaignStatus
+  }
+
+  const normalized = status?.toLowerCase() ?? ''
+  if (normalized.includes('cancel')) return 'canceled'
+  if (normalized.includes('pause')) return 'paused'
+  if (normalized.includes('complete') || normalized.includes('done')) return 'done'
+  if (normalized.includes('active') || normalized.includes('run')) return 'active'
+  return 'draft'
+}
+
+function normalizeCalculationStatus(status?: string): CalculationStatus {
+  if (status && allowedCalculationStatuses.includes(status as CalculationStatus)) {
+    return status as CalculationStatus
+  }
+
+  const normalized = status?.toLowerCase() ?? ''
+  if (normalized.includes('fail')) return 'failed'
+  if (normalized.includes('complete')) return 'completed'
+  if (normalized.includes('done')) return 'done'
+  if (normalized.includes('run')) return 'running'
+  if (normalized.includes('pend')) return 'pending'
+  return 'queued'
 }
 
 function toNumber(value: unknown): number | undefined {

@@ -6,6 +6,9 @@
 export { DeviceConnectionPill } from './DeviceConnectionPill'
 export { DeviceScanModal } from './DeviceScanModal'
 export { DeviceFileDownload } from './DeviceFileDownload'
+export { BleStatusPill } from './BleStatusPill'
+export { IotDownload } from './IotDownload'
+export { CompactDownloadButton } from './CompactDownloadButton'
 
 // Re-export types for convenience
 export type {
@@ -13,3 +16,6 @@ export type {
   DeviceScanModalProps,
   DeviceFileDownloadProps
 } from '../types'
+export type { BleStatusPillProps } from './BleStatusPill'
+export type { IotDownloadProps } from './IotDownload'
+export type { CompactDownloadButtonProps } from './CompactDownloadButton'

@@ -3,9 +3,53 @@
  * Gestion centralisée du cache et des requêtes serveur
  */
 
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, type QueryFunction } from '@tanstack/react-query'
 import { stateLog, logger } from '@/core/utils/logger'
 import { appConfig } from '@/core/utils/env'
+
+type QueryEventContext = {
+  queryKey: unknown
+  meta?: Record<string, unknown>
+}
+
+type QueryErrorDetails = {
+  message: string
+  status?: number
+  code?: string
+  meta?: unknown
+}
+
+const extractErrorDetails = (error: unknown): QueryErrorDetails => {
+  if (typeof error === 'object' && error !== null) {
+    const record = error as Record<string, unknown>
+    const message =
+      typeof record.message === 'string'
+        ? record.message
+        : error instanceof Error
+          ? error.message
+          : 'Unknown error'
+    const status = typeof record.status === 'number' ? record.status : undefined
+    const code = typeof record.code === 'string' ? record.code : undefined
+    const meta = record.meta
+    return { message, status, code, meta }
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message }
+  }
+
+  return { message: String(error ?? 'Unknown error') }
+}
+
+const hasAllKey = (value: unknown): value is { all: readonly unknown[] } => {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'all' in value &&
+    Array.isArray((value as { all?: unknown }).all)
+  )
+}
+
 
 // ==================== QUERY DEFAULTS ====================
 
@@ -16,12 +60,14 @@ const queryDefaults = {
     gcTime: 10 * 60 * 1000, // 10 minutes (anciennement cacheTime)
 
     // Retry policy
-    retry: (failureCount: number, error: any) => {
-      stateLog.debug('Query retry check', { failureCount, error: error?.message })
+    retry: (failureCount: number, error: Error | unknown) => {
+      const details = extractErrorDetails(error)
+      stateLog.debug('Query retry check', { failureCount, error: details.message })
 
       // Ne pas retry sur les erreurs 4xx sauf 408, 429
-      if (error?.status >= 400 && error?.status < 500) {
-        if (error?.status === 408 || error?.status === 429) {
+      const status = details.status
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        if (status === 408 || status === 429) {
           return failureCount < 2
         }
         return false
@@ -64,23 +110,25 @@ const queryDefaults = {
 
 // ==================== ERROR HANDLER ====================
 
-const defaultErrorHandler = (error: any, query?: any) => {
+const _defaultErrorHandler = (error: unknown, query?: QueryEventContext) => {
+  const details = extractErrorDetails(error)
   const errorInfo = {
-    message: error?.message || 'Unknown error',
-    status: error?.status,
-    code: error?.code,
+    message: details.message,
+    status: details.status,
+    code: details.code,
     queryKey: query?.queryKey,
-    meta: query?.meta
+    meta: query?.meta ?? details.meta
   }
 
   stateLog.error('Query error', errorInfo)
 
-  // En dev, afficher plus de détails
+  // En dev, afficher plus de détails via logger
   if (appConfig.isDev) {
-    console.group('🔴 Query Error Details')
-    console.error('Error:', error)
-    console.log('Query:', query)
-    console.groupEnd()
+    logger.error('react-query', 'Detailed query error', {
+      error: details,
+      rawError: error,
+      query
+    })
   }
 
   // Ici on pourrait intégrer avec un système de reporting d'erreurs
@@ -148,7 +196,7 @@ export const queryKeys = {
   devices: {
     all: ['devices'] as const,
     lists: () => [...queryKeys.devices.all, 'list'] as const,
-    list: (filters?: Record<string, any>) =>
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.devices.lists(), { filters }] as const,
     details: () => [...queryKeys.devices.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.devices.details(), id] as const,
@@ -162,7 +210,7 @@ export const queryKeys = {
   sites: {
     all: ['sites'] as const,
     lists: () => [...queryKeys.sites.all, 'list'] as const,
-    list: (filters?: Record<string, any>) =>
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.sites.lists(), { filters }] as const,
     details: () => [...queryKeys.sites.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.sites.details(), id] as const,
@@ -174,7 +222,7 @@ export const queryKeys = {
   campaigns: {
     all: ['campaigns'] as const,
     lists: () => [...queryKeys.campaigns.all, 'list'] as const,
-    list: (filters?: Record<string, any>) =>
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.campaigns.lists(), { filters }] as const,
     details: () => [...queryKeys.campaigns.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.campaigns.details(), id] as const,
@@ -186,7 +234,7 @@ export const queryKeys = {
   processing: {
     all: ['processing'] as const,
     lists: () => [...queryKeys.processing.all, 'list'] as const,
-    list: (filters?: Record<string, any>) =>
+    list: (filters?: Record<string, unknown>) =>
       [...queryKeys.processing.lists(), { filters }] as const,
     details: () => [...queryKeys.processing.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.processing.details(), id] as const,
@@ -205,6 +253,15 @@ export const queryKeys = {
   }
 } as const
 
+const resolveDomainKey = (domain: keyof typeof queryKeys): readonly unknown[] => {
+  const domainEntry = queryKeys[domain]
+  if (hasAllKey(domainEntry)) {
+    return domainEntry.all
+  }
+
+  return [domain]
+}
+
 // ==================== CACHE UTILITIES ====================
 
 /**
@@ -217,8 +274,10 @@ export const cacheUtils = {
   invalidateDomain: (client: QueryClient, domain: keyof typeof queryKeys) => {
     const timer = logger.time(`Invalidate ${domain}`)
 
+    const queryKey = resolveDomainKey(domain)
+
     client.invalidateQueries({
-      queryKey: (queryKeys[domain] as any).all
+      queryKey
     })
 
     timer.end({ domain })
@@ -231,8 +290,10 @@ export const cacheUtils = {
   removeDomain: (client: QueryClient, domain: keyof typeof queryKeys) => {
     const timer = logger.time(`Remove ${domain}`)
 
+    const queryKey = resolveDomainKey(domain)
+
     client.removeQueries({
-      queryKey: (queryKeys[domain] as any).all
+      queryKey
     })
 
     timer.end({ domain })
@@ -242,26 +303,32 @@ export const cacheUtils = {
   /**
    * Précharge une query
    */
-  prefetch: async (
+  prefetch: async <T = unknown>(
     client: QueryClient,
     queryKey: readonly unknown[],
-    queryFn: () => Promise<any>,
+    queryFn: () => Promise<T>,
     options?: { staleTime?: number }
   ) => {
     const timer = logger.time(`Prefetch ${queryKey.join('.')}`)
 
     try {
+      const wrappedQueryFn: QueryFunction<T, readonly unknown[], never> = async (context) => {
+        void context
+        return queryFn()
+      }
+
       await client.prefetchQuery({
         queryKey,
-        queryFn: queryFn as any,
+        queryFn: wrappedQueryFn,
         staleTime: options?.staleTime
       })
 
       timer.end({ success: true })
       stateLog.debug('Query prefetched', { queryKey })
     } catch (error) {
-      timer.end({ error })
-      stateLog.error('Query prefetch failed', { queryKey, error })
+      const details = extractErrorDetails(error)
+      timer.end({ error: details })
+      stateLog.error('Query prefetch failed', { queryKey, error: details })
     }
   },
 

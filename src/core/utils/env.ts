@@ -102,9 +102,10 @@ function createAppConfig(): AppConfig {
   const isProduction = mode === 'production'
 
   // URLs API
-  const localUrl = parseString(import.meta.env.VITE_SERVER_ADDRESS_LOCAL, 'http://localhost:3000')
+  const localUrl = parseString(import.meta.env.VITE_SERVER_ADDRESS_LOCAL, 'http://localhost:3313')
   const webUrl = parseString(import.meta.env.VITE_SERVER_ADDRESS_WEB, 'https://api.trackbee.com')
-  const currentUrl = isDev ? localUrl : webUrl
+  const useLocal = parseBoolean(import.meta.env.VITE_LOCAL, isDev)
+  const currentUrl = useLocal ? localUrl : webUrl
 
   const config: AppConfig = {
     // Application info
@@ -267,8 +268,17 @@ export function detectPlatform(): {
   const isIOS = /iphone|ipad|ipod/.test(userAgent)
   const isMobile = isAndroid || isIOS
 
-  // Capacitor injecte des variables globales
-  const isCapacitor = !!(window as any).Capacitor
+  // Capacitor injecte des variables globales ET on doit être sur une plateforme native
+  // En dev web, window.Capacitor existe mais on n'est pas vraiment dans Capacitor
+  const capacitorWindow = window as typeof window & {
+    Capacitor?: {
+      isNativePlatform?: () => boolean
+    }
+  }
+
+  const hasCapacitor = Boolean(capacitorWindow.Capacitor)
+  const isNativePlatform = capacitorWindow.Capacitor?.isNativePlatform?.() ?? false
+  const isCapacitor = hasCapacitor && (isNativePlatform || isMobile)
   const isWeb = !isCapacitor
 
   const name = isAndroid ? 'android' :
@@ -297,11 +307,18 @@ export function getDeviceInfo(): {
   connection?: string
   isOnline: boolean
 } {
+  const enhancedNavigator = navigator as Navigator & {
+    deviceMemory?: number
+    connection?: {
+      effectiveType?: string
+    }
+  }
+
   const info = {
-    hardwareConcurrency: navigator.hardwareConcurrency || 1,
-    memory: (navigator as any).deviceMemory,
-    connection: (navigator as any).connection?.effectiveType,
-    isOnline: navigator.onLine,
+    hardwareConcurrency: enhancedNavigator.hardwareConcurrency || 1,
+    memory: enhancedNavigator.deviceMemory,
+    connection: enhancedNavigator.connection?.effectiveType,
+    isOnline: enhancedNavigator.onLine,
   }
 
   logger.debug('general', '🔧 Device info:', info)
@@ -355,7 +372,7 @@ export const CONSTANTS = {
   BLE_SERVICE_A100: '0000a100-0000-1000-8000-00805f9b34fb',
   BLE_CHAR_WRITE: '0000a101-0000-1000-8000-00805f9b34fb',
   BLE_CHAR_NOTIFY: '0000a102-0000-1000-8000-00805f9b34fb',
-  BLE_DEVICE_PREFIX: 'TRB',
+  BLE_DEVICE_PREFIX: 'TR', // Changed from 'TRB' to 'TR' to match actual device naming (TRXXXXXXXXXXXX)
 
   // WiFi SoftAP
   SOFTAP_PREFIX: 'TRB-AP-',

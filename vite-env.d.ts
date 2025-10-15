@@ -58,7 +58,7 @@ declare module '*.scss' {
 
 declare module '*.svg' {
   import { FC, SVGProps } from 'react'
-  const content: FC<SVGProps<SVGElement>>
+  const content: FC<SVGProps<SVGSVGElement>>
   export default content
 }
 
@@ -90,7 +90,7 @@ declare module '*.webp' {
 // PUSH FINAL - Window globals pour debug
 declare global {
   interface Window {
-    __REACT_ROOT__?: any
-    __REACT_DEVTOOLS_GLOBAL_HOOK__?: any
+    __REACT_ROOT__?: unknown
+    __REACT_DEVTOOLS_GLOBAL_HOOK__?: Record<string, unknown>
   }
 }

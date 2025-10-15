@@ -6,7 +6,7 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import type { Machine, Site, Installation, Campaign, MachineId, SiteId, InstallationId, CampaignId } from '@/core/types/domain'
+import type { Machine, Site, Installation, Campaign, MachineId, SiteId } from '@/core/types/domain'
 import type { BleConnectionState, BleDeviceInfo } from '@/core/types/transport'
 import { stateLog, logger } from '@/core/utils/logger'
 import { bleManager } from '@/core/services/ble/BleManager'
@@ -369,9 +369,13 @@ export const useDeviceStore = create<DeviceStore>()(
         try {
           stateLog.debug('🔍 Starting BLE scan')
 
+          const knownMacs = Array.from(get().knownDevices.values())
+            .map((machine: Machine) => machine.macAddress ?? machine.macD ?? null)
+            .filter((mac): mac is string => typeof mac === 'string' && mac.trim().length > 0)
+
           const devices = await bleManager.scanForDevices({
             timeout: 10000,
-            knownMacs: Array.from(get().knownDevices.values()).map((machine: Machine) => machine.macAddress)
+            knownMacs
           })
 
           set((state) => {
@@ -421,7 +425,9 @@ export const useDeviceStore = create<DeviceStore>()(
             error: undefined
           })
 
-          stateLog.debug('🔗 Connecting to device', { machineId, deviceId, mac: machine.macAddress })
+          const macAddress = machine.macAddress ?? machine.macD
+
+          stateLog.debug('🔗 Connecting to device', { machineId, deviceId, mac: macAddress })
 
           // Utiliser deviceId fourni ou scanner par MAC
           let targetDeviceId = deviceId
@@ -429,14 +435,19 @@ export const useDeviceStore = create<DeviceStore>()(
           if (!targetDeviceId) {
             // Scanner pour trouver le device par MAC
             const discovered = Array.from(get().discoveredDevices.values())
+            if (!macAddress) {
+              throw new Error(`Machine ${machineId} does not have a MAC address`)
+            }
+
+            const normalizedMac = macAddress.replace(/:/g, '').toLowerCase()
             const matchingDevice = discovered.find(device =>
-              device.name?.includes(machine.macAddress.replace(/:/g, '').toLowerCase())
+              device.name?.toLowerCase().includes(normalizedMac)
             )
 
             if (matchingDevice) {
               targetDeviceId = matchingDevice.deviceId
             } else {
-              throw new Error(`Device not found for MAC ${machine.macAddress}`)
+              throw new Error(`Device not found for MAC ${macAddress}`)
             }
           }
 
@@ -697,7 +708,7 @@ export const deviceSelectors = {
       const searchLower = search.toLowerCase()
       machines = machines.filter(machine =>
         machine.name.toLowerCase().includes(searchLower) ||
-        machine.macAddress.toLowerCase().includes(searchLower)
+        (machine.macAddress ?? machine.macD ?? '').toLowerCase().includes(searchLower)
       )
     }
 

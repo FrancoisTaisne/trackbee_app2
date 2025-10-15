@@ -1,7 +1,6 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
+﻿/**
  * SiteListPage Component - Page de liste des sites
- * Interface principale pour visualiser, gérer et créer des sites géographiques
+ * Interface principale pour visualiser, gÃ©rer et crÃ©er des sites gÃ©ographiques
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
@@ -9,7 +8,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus,
   Search,
-  Filter,
   Map,
   List,
   Globe,
@@ -20,52 +18,38 @@ import {
   MoreVertical,
   Edit3,
   Trash2,
-  ExternalLink,
-  Download
+  ExternalLink
 } from 'lucide-react'
-// PUSH FINAL: Composants UI temporaires avec any pour déblocage massif
-const AppLayout: any = 'div'
-const PageHeader: any = 'div'
-const Section: any = 'div'
-const Card: any = 'div'
-const CardHeader: any = 'div'
-const CardTitle: any = 'h3'
-const CardContent: any = 'div'
-const Button: any = 'button'
-const Input: any = 'input'
-const Badge: any = 'span'
-const Select: any = 'select'
-const SelectContent: any = 'div'
-const SelectItem: any = 'option'
-const SelectTrigger: any = 'button'
-const SelectValue: any = 'span'
-const DropdownMenu: any = 'div'
-const DropdownMenuTrigger: any = 'button'
-const DropdownMenuContent: any = 'div'
-const DropdownMenuItem: any = 'button'
-const ConfirmationModal: any = 'div'
-const Tabs: any = 'div'
-const TabsList: any = 'div'
-const TabsTrigger: any = 'button'
-const TabsContent: any = 'div'
-// PUSH FINAL: Composants et types temporaires avec any
-const SiteMapView: any = 'div'
-const SiteForm: any = 'div'
-const useSiteList: any = () => ({})
-const useSiteMap: any = () => ({})
 
+// UI Components imports
+import { AppLayout, PageHeader, Section, Breadcrumb } from '@/shared/ui/components/Layout'
+import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/components/Card/Card'
+import { Button } from '@/shared/ui/components/Button/Button'
+import { Input } from '@/shared/ui/components/Input/Input'
+import { Badge } from '@/shared/ui/components/Badge/Badge'
+import { ConfirmationModal } from '@/shared/ui/components/Modal/Modal'
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+} from '@/shared/ui/components/Tabs/Tabs'
+
+// Site feature imports
+import { useSiteList } from '../hooks/useSiteList'
+import { useSiteMap } from '../hooks/useSiteMap'
+import { SiteMapView } from '../components/SiteMapView'
+import { SiteForm } from '../components/SiteForm'
+import type {
+  SiteBundle,
+  SiteFilters,
+  SiteSorting,
+  CreateSiteData
+} from '../types'
+
+// Core utilities
 import { logger } from '@/core/utils/logger'
 import { formatDistanceToNow } from '@/core/utils/time'
-
-// PUSH FINAL: Utilitaires temporaires
-const cn = (...args: any[]) => args.join(' ')
-
-// PUSH FINAL: Types et constants temporaires avec any
-type SiteBundle = any
-type SiteFilters = any
-type SiteSorting = any
-type CreateSiteData = any
-const COORDINATE_SYSTEMS: any = {}
 
 // ==================== LOGGER SETUP ====================
 
@@ -94,6 +78,7 @@ const SiteCard: React.FC<SiteCardProps> = ({
   onViewOnMap
 }) => {
   const { site: siteData, statistics } = site
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <Card
@@ -109,12 +94,12 @@ const SiteCard: React.FC<SiteCardProps> = ({
               </h3>
               <div className="flex items-center space-x-1">
                 {siteData.isPublic ? (
-                  <Globe className="w-4 h-4 text-success-500" title="Site public" />
+                  <Globe className="w-4 h-4 text-success-500" />
                 ) : (
-                  <Lock className="w-4 h-4 text-gray-400" title="Site privé" />
+                  <Lock className="w-4 h-4 text-gray-400" />
                 )}
                 {siteData.ownership === 'shared' && (
-                  <Users className="w-4 h-4 text-primary-500" title="Site partagé" />
+                  <Users className="w-4 h-4 text-primary-500" />
                 )}
               </div>
             </CardTitle>
@@ -139,40 +124,70 @@ const SiteCard: React.FC<SiteCardProps> = ({
               )}
             </div>
           </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => e.stopPropagation()}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(event) => {
+                event.stopPropagation()
+                setMenuOpen((prev) => !prev)
+              }}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+            {menuOpen && (
+              <div
+                className="absolute right-0 mt-2 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10"
+                onClick={(event) => event.stopPropagation()}
               >
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(site) }}>
-                <Edit3 className="w-4 h-4 mr-2" />
-                Modifier
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewOnMap(site) }}>
-                <Map className="w-4 h-4 mr-2" />
-                Voir sur la carte
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(site) }}>
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Voir le détail
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={(e) => { e.stopPropagation(); onDelete(site) }}
-                className="text-danger-600"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Supprimer
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onEdit(site)
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  Modifier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onViewOnMap(site)
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  <Map className="w-4 h-4 mr-2" />
+                  Voir sur la carte
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onSelect(site)
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Voir le dÃ©tail
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onDelete(site)
+                  }}
+                  className="flex w-full items-center px-3 py-2 text-sm text-danger-600 hover:bg-danger-50"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Supprimer
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -186,7 +201,7 @@ const SiteCard: React.FC<SiteCardProps> = ({
               </div>
               <div className="text-xs font-mono text-primary-600">
                 {siteData.lat.toFixed(4)}, {siteData.lng.toFixed(4)}
-                {siteData.altitude && ` • ${siteData.altitude}m`}
+                {siteData.altitude && ` â€¢ ${siteData.altitude}m`}
               </div>
             </div>
           </div>
@@ -194,7 +209,7 @@ const SiteCard: React.FC<SiteCardProps> = ({
           <div className="p-3 bg-gray-50 rounded-lg">
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <MapPin className="w-4 h-4" />
-              <span>Position non définie</span>
+              <span>Position non dÃ©finie</span>
             </div>
           </div>
         )}
@@ -223,7 +238,7 @@ const SiteCard: React.FC<SiteCardProps> = ({
         {/* Last Activity */}
         {statistics.lastActivity && (
           <div className="text-xs text-gray-500 text-center">
-            Dernière activité: {formatDistanceToNow(statistics.lastActivity)}
+            DerniÃ¨re activitÃ©: {formatDistanceToNow(statistics.lastActivity)}
           </div>
         )}
       </CardContent>
@@ -240,12 +255,12 @@ export const SiteListPage: React.FC = () => {
   const [view, setView] = useState<'list' | 'map'>('list')
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [siteToDelete, setSiteToDelete] = useState<SiteBundle | null>(null)
-  const [selectedSite, setSelectedSite] = useState<SiteBundle | null>(null)
+  const [selectedSite, setSelectedSite] = useState<SiteBundle | undefined>(undefined)
 
   // Filters and sorting
   const [filters, setFilters] = useState<SiteFilters>({
     search: '',
-    ownership: 'all',
+    ownership: 'all' as const,
     hasInstallations: undefined,
     isPublic: undefined
   })
@@ -265,12 +280,7 @@ export const SiteListPage: React.FC = () => {
     deleteSite
   } = useSiteList(filters, sorting)
 
-  const {
-    sites: mapSites,
-    bounds,
-    setFilters: setMapFilters,
-    getCurrentPosition
-  } = useSiteMap()
+  const { sites: mapSites } = useSiteMap()
 
   // ==================== HANDLERS ====================
 
@@ -278,16 +288,12 @@ export const SiteListPage: React.FC = () => {
     setFilters(prev => ({ ...prev, search: value }))
   }, [])
 
-  const handleFilterChange = useCallback((key: keyof SiteFilters, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-  }, [])
-
-  const handleSortingChange = useCallback((field: SiteSorting['field']) => {
-    setSorting(prev => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
-    }))
-  }, [])
+  const handleFilterChange = useCallback(
+    <K extends keyof SiteFilters>(key: K, value: SiteFilters[K] | undefined) => {
+      setFilters(prev => ({ ...prev, [key]: value }))
+    },
+    []
+  )
 
   const handleSiteSelect = useCallback((site: SiteBundle) => {
     siteListLog.debug('Site selected from list', {
@@ -379,8 +385,8 @@ export const SiteListPage: React.FC = () => {
     return (
       <AppLayout title="Nouveau site">
         <PageHeader
-          title="Créer un nouveau site"
-          description="Définissez un site géographique pour y installer vos devices TrackBee"
+          title="CrÃ©er un nouveau site"
+          description="DÃ©finissez un site gÃ©ographique pour y installer vos devices TrackBee"
           breadcrumbs={[
             { label: 'Sites', href: '/sites' },
             { label: 'Nouveau', href: '/sites/new' }
@@ -400,8 +406,8 @@ export const SiteListPage: React.FC = () => {
   return (
     <AppLayout title="Sites">
       <PageHeader
-        title="Sites géographiques"
-        description="Gérez vos sites de mesure et leurs installations"
+        title="Sites gÃ©ographiques"
+        description="GÃ©rez vos sites de mesure et leurs installations"
         action={
           <Button
             variant="primary"
@@ -426,53 +432,62 @@ export const SiteListPage: React.FC = () => {
             />
 
             <div className="flex flex-wrap gap-3">
-              <Select
-                value={filters.ownership || 'all'}
-                onValueChange={(value) => handleFilterChange('ownership', value === 'all' ? undefined : value)}
+              <select
+                className="w-40 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={filters.ownership ?? 'all'}
+                onChange={(event) => {
+                  const value = event.target.value as SiteFilters['ownership'] | 'all'
+                  handleFilterChange('ownership', value === 'all' ? undefined : value)
+                }}
               >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les sites</SelectItem>
-                  <SelectItem value="owner">Mes sites</SelectItem>
-                  <SelectItem value="shared">Sites partagés</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="all">Tous les sites</option>
+                <option value="owner">Mes sites</option>
+                <option value="shared">Sites partagÃ©s</option>
+              </select>
 
-              <Select
-                value={filters.hasInstallations === undefined ? 'all' : filters.hasInstallations ? 'with' : 'without'}
-                onValueChange={(value) => handleFilterChange(
-                  'hasInstallations',
-                  value === 'all' ? undefined : value === 'with'
-                )}
+              <select
+                className="w-44 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={
+                  filters.hasInstallations === undefined
+                    ? 'all'
+                    : filters.hasInstallations
+                      ? 'with'
+                      : 'without'
+                }
+                onChange={(event) => {
+                  const value = event.target.value
+                  handleFilterChange(
+                    'hasInstallations',
+                    value === 'all' ? undefined : value === 'with'
+                  )
+                }}
               >
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes installations</SelectItem>
-                  <SelectItem value="with">Avec installations</SelectItem>
-                  <SelectItem value="without">Sans installation</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="all">Toutes installations</option>
+                <option value="with">Avec installations</option>
+                <option value="without">Sans installation</option>
+              </select>
 
-              <Select
-                value={filters.isPublic === undefined ? 'all' : filters.isPublic ? 'public' : 'private'}
-                onValueChange={(value) => handleFilterChange(
-                  'isPublic',
-                  value === 'all' ? undefined : value === 'public'
-                )}
+              <select
+                className="w-36 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={
+                  filters.isPublic === undefined
+                    ? 'all'
+                    : filters.isPublic
+                      ? 'public'
+                      : 'private'
+                }
+                onChange={(event) => {
+                  const value = event.target.value
+                  handleFilterChange(
+                    'isPublic',
+                    value === 'all' ? undefined : value === 'public'
+                  )
+                }}
               >
-                <SelectTrigger className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Public/Privé</SelectItem>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="private">Privé</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="all">Public/PrivÃ©</option>
+                <option value="public">Public</option>
+                <option value="private">PrivÃ©</option>
+              </select>
             </div>
           </div>
 
@@ -517,25 +532,24 @@ export const SiteListPage: React.FC = () => {
             </TabsList>
 
             <div className="flex items-center space-x-2">
-              <Select
+              <select
+                className="w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={`${sorting.field}-${sorting.direction}`}
-                onValueChange={(value) => {
-                  const [field, direction] = value.split('-') as [SiteSorting['field'], SiteSorting['direction']]
+                onChange={(event) => {
+                  const [field, direction] = event.target.value.split('-') as [
+                    SiteSorting['field'],
+                    SiteSorting['direction']
+                  ]
                   setSorting({ field, direction })
                 }}
               >
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name-asc">Nom A → Z</SelectItem>
-                  <SelectItem value="name-desc">Nom Z → A</SelectItem>
-                  <SelectItem value="createdAt-desc">Plus récents</SelectItem>
-                  <SelectItem value="createdAt-asc">Plus anciens</SelectItem>
-                  <SelectItem value="installationCount-desc">Plus d'installations</SelectItem>
-                  <SelectItem value="installationCount-asc">Moins d'installations</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="name-asc">Nom A â†’ Z</option>
+                <option value="name-desc">Nom Z â†’ A</option>
+                <option value="createdAt-desc">Plus rÃ©cents</option>
+                <option value="createdAt-asc">Plus anciens</option>
+                <option value="installationCount-desc">Plus d'installations</option>
+                <option value="installationCount-asc">Moins d'installations</option>
+              </select>
             </div>
           </div>
 
@@ -572,7 +586,7 @@ export const SiteListPage: React.FC = () => {
                   {error.message}
                 </p>
                 <Button onClick={() => refetch()}>
-                  Réessayer
+                  RÃ©essayer
                 </Button>
               </div>
             ) : sites.length === 0 ? (
@@ -581,12 +595,12 @@ export const SiteListPage: React.FC = () => {
                   <MapPin className="w-12 h-12 mx-auto" />
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Aucun site trouvé
+                  Aucun site trouvÃ©
                 </h3>
                 <p className="text-gray-600 mb-4">
                   {filters.search
-                    ? 'Aucun site ne correspond à votre recherche.'
-                    : 'Commencez par créer votre premier site de mesure.'
+                    ? 'Aucun site ne correspond Ã  votre recherche.'
+                    : 'Commencez par crÃ©er votre premier site de mesure.'
                   }
                 </p>
                 <Button
@@ -594,7 +608,7 @@ export const SiteListPage: React.FC = () => {
                   onClick={() => setShowCreateForm(true)}
                   leftIcon={<Plus className="w-4 h-4" />}
                 >
-                  Créer un site
+                  CrÃ©er un site
                 </Button>
               </div>
             ) : (
@@ -638,11 +652,11 @@ export const SiteListPage: React.FC = () => {
         title="Supprimer le site"
         message={
           siteToDelete
-            ? `Êtes-vous sûr de vouloir supprimer le site "${siteToDelete.site.name}" ? Cette action est irréversible et supprimera également toutes les installations associées.`
+            ? `ÃŠtes-vous sÃ»r de vouloir supprimer le site "${siteToDelete.site.name}" ? Cette action est irrÃ©versible et supprimera Ã©galement toutes les installations associÃ©es.`
             : ''
         }
         confirmText="Supprimer"
-        confirmVariant="danger"
+        variant="danger"
       />
     </AppLayout>
   )
@@ -651,3 +665,7 @@ export const SiteListPage: React.FC = () => {
 // ==================== DISPLAY NAME ====================
 
 SiteListPage.displayName = 'SiteListPage'
+
+
+
+

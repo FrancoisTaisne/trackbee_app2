@@ -33,11 +33,11 @@ export async function withRetry<T>(
   options: {
     maxRetries?: number
     delayMs?: number
-    onError?: (error: any, attempt: number) => void
+    onError?: (error: unknown, attempt: number) => void
   } = {}
 ): Promise<T> {
   const { maxRetries = 3, delayMs = 1000, onError } = options
-  let lastError: any
+  let lastError: unknown
 
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
     try {
@@ -75,23 +75,23 @@ export function formatTransferSpeed(bytesPerSecond: number): string {
   return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`
 }
 
-export function debounce<T extends (...args: any[]) => void>(
+export function debounce<T extends (...args: unknown[]) => void>(
   func: T,
   delay: number
 ): T {
-  let timeoutId: NodeJS.Timeout
-  return ((...args: any[]) => {
+  let timeoutId: ReturnType<typeof setTimeout>
+  return ((...args: unknown[]) => {
     clearTimeout(timeoutId)
     timeoutId = setTimeout(() => func(...args), delay)
   }) as T
 }
 
-export function throttle<T extends (...args: any[]) => void>(
+export function throttle<T extends (...args: unknown[]) => void>(
   func: T,
   limit: number
 ): T {
   let inThrottle: boolean
-  return ((...args: any[]) => {
+  return ((...args: unknown[]) => {
     if (!inThrottle) {
       func(...args)
       inThrottle = true

@@ -71,7 +71,7 @@ export class MachineService {
     try {
       // Essayer d'abord avec l'endpoint modérateur (plus permissif)
       return await MachineService.getAllByModerator()
-    } catch (error) {
+    } catch {
       // Si ça échoue, essayer avec l'endpoint admin
       return await MachineService.getAll()
     }
@@ -157,20 +157,7 @@ export class MachineService {
     return response.data
   }
 
-  /**
-   * Récupérer toutes les machines d'un modérateur
-   */
-  static async getAllByModerator(): Promise<Machine[]> {
-    const response = await httpClient.get<Machine[]>(
-      API_ENDPOINTS.machines.allByMod
-    )
-
-    if (!response.data) {
-      throw new Error('No data in moderator machines response')
-    }
-
-    return response.data
-  }
+  // Duplicate method removed (getAllByModerator already defined above)
 
   /**
    * Vérifier la santé du système (Health check)
@@ -250,8 +237,10 @@ export class MachineService {
       if (machine.model) {
         stats.byModel[machine.model] = (stats.byModel[machine.model] || 0) + 1
       }
-      if (machine.assignedUserId) {
-        const userId = machine.assignedUserId.toString()
+      // Note: assignedUserId is not in Machine interface - would need backend support
+      const machineWithUser = machine as Machine & { assignedUserId?: number }
+      if (machineWithUser.assignedUserId) {
+        const userId = machineWithUser.assignedUserId.toString()
         stats.byUser[userId] = (stats.byUser[userId] || 0) + 1
       }
     })

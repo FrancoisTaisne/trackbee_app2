@@ -3,8 +3,21 @@
  * Types génériques et utilitaires
  */
 
-// Re-export d'AppError pour compatibilité
-export type { AppError } from './transport'
+// AppError class for application errors
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public context?: string,
+    public originalError?: Error
+  ) {
+    super(message)
+    this.name = 'AppError'
+  }
+}
+
+// Re-export type for compatibility
+export type { AppError as AppErrorType } from './transport'
 
 // Adresse géographique
 export interface Address {
@@ -42,7 +55,7 @@ export interface GeocodingOptions {
 export interface GeocodingError {
   code: 'NETWORK_ERROR' | 'NOT_FOUND' | 'QUOTA_EXCEEDED' | 'INVALID_REQUEST'
   message: string
-  details?: any
+  details?: Record<string, unknown>
 }
 
 // Nom standard de lieux
@@ -65,5 +78,35 @@ export interface SearchOptions {
   bounds?: Bounds
   proximity?: Coordinates
   types?: string[]
-  filters?: Record<string, any>
+  filters?: Record<string, unknown>
 }
+
+// Types JSON pour remplacer any
+export type JsonPrimitive = string | number | boolean | null
+export type JsonArray = JsonValue[]
+export type JsonObject = { [key: string]: JsonValue }
+export type JsonValue = JsonPrimitive | JsonObject | JsonArray
+
+// Types pour les erreurs
+export type ErrorLike = Error | { message: string; code?: string }
+
+// Types pour les callbacks
+export type CallbackFn<T = void> = (arg: T) => void
+export type AsyncCallbackFn<T = void> = (arg: T) => Promise<void>
+
+// Type pour les réponses API génériques
+export interface ApiResponse<T = unknown> {
+  success: boolean
+  data?: T
+  error?: ErrorLike
+  message?: string
+}
+
+// Type pour les données de formulaire
+export type FormData = Record<string, JsonValue>
+
+// Type pour les headers HTTP
+export type HttpHeaders = Record<string, string>
+
+// Type pour les paramètres de requête
+export type QueryParams = Record<string, string | number | boolean | undefined>

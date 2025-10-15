@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Campaign Detail Hook
  * Hook principal pour la gestion d'une campagne spécifique
@@ -7,68 +6,127 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
-// PUSH FINAL: Types temporaires avec any pour déblocage massif
-type CampaignBundle = any
-type CampaignStatistics = any
-type UpdateCampaignData = any
-type UseCampaignReturn = any
-type CampaignFile = any
+import type { CampaignId, Campaign, CalculationId } from '@/core/types/domain'
+import type {
+  CampaignBundle,
+  CampaignCalculation,
+  CampaignFile,
+  CampaignStatistics,
+  UpdateCampaignData,
+  UseCampaignReturn
+} from '../types'
+import { UpdateCampaignSchema } from '../types'
 
-import type { CampaignId, Campaign, Calculation, CalculationId } from '@/core/types/domain'
+// ==================== TYPES ====================
 
-// PUSH FINAL: Constants temporaires avec any
-const campaignQueryKeys: any = {}
-const UpdateCampaignSchema: any = {}
+type CalculationConfig = Record<string, unknown>
 
-const log = logger
+const campaignQueryKeys = {
+  all: ['campaigns'] as const,
+  lists: () => ['campaigns', 'list'] as const,
+  detail: (id: CampaignId) => ['campaigns', 'detail', id] as const,
+  bundle: (id: CampaignId) => ['campaigns', 'bundle', id] as const,
+  calculations: (id: CampaignId) => ['campaigns', 'detail', id, 'calculations'] as const,
+  statistics: () => ['campaigns', 'statistics'] as const,
+}
+
+const log = logger.extend('campaign')
 
 // ==================== API FUNCTIONS ====================
 
 async function fetchCampaignBundle(campaignId: CampaignId): Promise<CampaignBundle> {
   log.debug('fetchCampaignBundle', { campaignId })
 
-  const campaignResponse = await httpClient.get(`/api/campaigns/${campaignId}`)
-  const calculationsResponse = await httpClient.get(`/api/campaigns/${campaignId}/calculations`)
-  const filesResponse = await httpClient.get(`/api/campaigns/${campaignId}/files`)
-  const statisticsResponse = await httpClient.get(`/api/campaigns/${campaignId}/statistics`)
+  const campaignResponse = await httpClient.get<Campaign>(`/api/campaigns/${campaignId}`)
+  const calculationsResponse = await httpClient.get<CampaignCalculation[]>(`/api/campaigns/${campaignId}/calculations`)
+  const filesResponse = await httpClient.get<Array<Record<string, unknown>>>(`/api/campaigns/${campaignId}/files`)
+  const statisticsResponse = await httpClient.get<Partial<CampaignStatistics> & { lastActivityAt?: string | Date }>(
+    `/api/campaigns/${campaignId}/statistics`
+  )
 
-  const campaign = campaignResponse.data as Campaign
-  const calculations = calculationsResponse.data as Calculation[]
-  const files = filesResponse.data as CampaignFile[]
-  const statistics = statisticsResponse.data as CampaignStatistics
+  const campaign = campaignResponse.data
+  if (!campaign) {
+    throw new Error(`Campaign ${campaignId} introuvable`)
+  }
 
-  const bundle: CampaignBundle = {
-    campaign,
-    calculations: calculations || [],
-    files: files || [],
-    statistics: statistics || {
-      totalCampaigns: 1,
-      activeCampaigns: campaign.status === 'active' ? 1 : 0,
-      completedCampaigns: campaign.status === 'done' ? 1 : 0,
-      failedCampaigns: 0,
-      totalCalculations: calculations?.length || 0,
-      successfulCalculations: calculations?.filter(c => c.status === 'done').length || 0,
-      averageDuration: 0,
-      totalFiles: files?.length || 0,
-      totalDataSize: 0
+  const calculations = Array.isArray(calculationsResponse.data)
+    ? (calculationsResponse.data as CampaignCalculation[])
+    : []
+
+  const files = (Array.isArray(filesResponse.data) ? filesResponse.data : []).map((file, index): CampaignFile => {
+    const uploadedAt = (file.uploadedAt ?? (file as { uploaded_at?: string }).uploaded_at) as string | undefined
+    const processed = file.processed ?? (file as { isProcessed?: boolean }).isProcessed ?? false
+
+    return {
+      id: typeof file.id === 'string' || typeof file.id === 'number'
+        ? String(file.id)
+        : `${campaignId}-file-${index}`,
+      campaignId: campaign.id,
+      name: typeof file.name === 'string' ? file.name : `fichier-${index + 1}`,
+      type: (file.type as CampaignFile['type']) || 'result',
+      size: typeof file.size === 'number' ? file.size : undefined,
+      hash: typeof file.hash === 'string' ? file.hash : undefined,
+      uploadedAt: uploadedAt ? new Date(uploadedAt).toISOString() : undefined,
+      processed: Boolean(processed),
+      recordedAt: typeof file.recordedAt === 'string' ? file.recordedAt : undefined,
+      deviceTimestamp: typeof file.deviceTimestamp === 'string' ? file.deviceTimestamp : undefined
     }
+  })
+
+  const statsRaw = (statisticsResponse.data ?? {}) as Partial<CampaignStatistics> & {
+    lastActivityAt?: string | Date
+  }
+  const lastActivitySource = statsRaw.lastActivity ?? statsRaw.lastActivityAt ?? campaign.updatedAt
+  const lastActivity = lastActivitySource instanceof Date
+    ? lastActivitySource.toISOString()
+    : typeof lastActivitySource === 'string'
+      ? lastActivitySource
+      : undefined
+
+  const statistics: CampaignStatistics = {
+    totalCampaigns: statsRaw.totalCampaigns ?? 1,
+    activeCampaigns: statsRaw.activeCampaigns ?? (campaign.status === 'active' ? 1 : 0),
+    completedCampaigns: statsRaw.completedCampaigns ?? (['done', 'completed'].includes(campaign.status) ? 1 : 0),
+    failedCampaigns: statsRaw.failedCampaigns ?? 0,
+    totalCalculations: statsRaw.totalCalculations ?? calculations.length,
+    successfulCalculations: statsRaw.successfulCalculations
+      ?? calculations.filter(c => c.status === 'done' || c.status === 'completed').length,
+    averageDuration: statsRaw.averageDuration ?? 0,
+    totalFiles: statsRaw.totalFiles ?? files.length,
+    totalDataSize: statsRaw.totalDataSize ?? files.reduce((acc, file) => acc + (file.size ?? 0), 0),
+    lastActivity
   }
 
   log.info('Campaign bundle loaded', {
     campaignId,
-    calculationsCount: bundle.calculations.length,
-    filesCount: bundle.files.length
+    calculationsCount: calculations.length,
+    filesCount: files.length
   })
 
-  return bundle
+  return {
+    campaign,
+    calculations,
+    files,
+    statistics
+  }
 }
 
 async function updateCampaign(campaignId: CampaignId, data: UpdateCampaignData): Promise<Campaign> {
   log.debug('updateCampaign', { campaignId, data })
 
-  const validated = UpdateCampaignSchema.parse(data)
-  const response = await httpClient.put(`/api/campaigns/${campaignId}`, validated)
-  const updated = response.data as Campaign
+  const normalized: UpdateCampaignData = {
+    ...data,
+    scheduledAt: data.scheduledAt
+      ? (data.scheduledAt instanceof Date ? data.scheduledAt.toISOString() : data.scheduledAt)
+      : undefined
+  }
+
+  const validated = UpdateCampaignSchema.parse(normalized)
+  const response = await httpClient.put<Campaign>(`/api/campaigns/${campaignId}`, validated)
+  const updated = response.data
+  if (!updated) {
+    throw new Error('Campaign update response missing data')
+  }
 
   log.info('Campaign updated', { campaignId, updated })
   return updated
@@ -114,19 +172,34 @@ async function cancelCampaign(campaignId: CampaignId): Promise<void> {
   log.info('Campaign canceled', { campaignId })
 }
 
-async function createCalculation(campaignId: CampaignId, config: any = {}): Promise<Calculation> {
+async function createCalculation(campaignId: CampaignId, config: CalculationConfig = {}): Promise<CampaignCalculation> {
   log.debug('createCalculation', { campaignId, config })
 
-  const calculation = await httpClient.post<Calculation>(`/api/campaigns/${campaignId}/calculations`, config)
+  const response = await httpClient.post<CampaignCalculation>(`/api/campaigns/${campaignId}/calculations`, config)
+  const calculation = response.data
+
+  if (!calculation) {
+    throw new Error('Calculation creation response missing data')
+  }
 
   log.info('Calculation created', { campaignId, calculationId: calculation.id })
   return calculation
 }
 
-async function retryCalculation(campaignId: CampaignId, calculationId: CalculationId): Promise<Calculation> {
+async function retryCalculation(
+  campaignId: CampaignId,
+  calculationId: CalculationId
+): Promise<CampaignCalculation> {
   log.debug('retryCalculation', { campaignId, calculationId })
 
-  const calculation = await httpClient.post<Calculation>(`/api/campaigns/${campaignId}/calculations/${calculationId}/retry`)
+  const response = await httpClient.post<CampaignCalculation>(
+    `/api/campaigns/${campaignId}/calculations/${calculationId}/retry`
+  )
+  const calculation = response.data
+
+  if (!calculation) {
+    throw new Error('Calculation retry response missing data')
+  }
 
   log.info('Calculation retried', { campaignId, calculationId })
   return calculation
@@ -216,7 +289,7 @@ export function useCampaign(campaignId: CampaignId): UseCampaignReturn {
   })
 
   const createCalculationMutation = useMutation({
-    mutationFn: (config?: any) => createCalculation(campaignId, config),
+    mutationFn: (config?: CalculationConfig) => createCalculation(campaignId, config),
     onSuccess: () => {
       // Invalider pour recharger les calculs
       queryClient.invalidateQueries({ queryKey: campaignQueryKeys.bundle(campaignId) })
@@ -279,12 +352,12 @@ export function useCampaign(campaignId: CampaignId): UseCampaignReturn {
 
 // ==================== HELPERS ====================
 
-export function getCampaignProgress(campaign: Campaign, calculations: Calculation[]): number {
-  if (campaign.status === 'done') return 100
-  if (campaign.status === 'canceled') return 0
+export function getCampaignProgress(campaign: Campaign, calculations: CampaignCalculation[]): number {
+  if (['done', 'completed'].includes(campaign.status)) return 100
+  if (['canceled', 'cancelled', 'failed', 'error'].includes(campaign.status)) return 0
   if (calculations.length === 0) return 0
 
-  const completed = calculations.filter(c => c.status === 'done').length
+  const completed = calculations.filter(c => c.status === 'done' || c.status === 'completed').length
   return Math.round((completed / calculations.length) * 100)
 }
 
@@ -299,7 +372,7 @@ export function getCampaignDuration(campaign: Campaign): number | null {
 
 export function getNextScheduledEvent(campaign: Campaign): Date | null {
   if (!campaign.scheduledAt) return null
-  if (campaign.status !== 'active') return null
+  if (!['active', 'scheduled', 'running'].includes(campaign.status)) return null
 
   const scheduled = new Date(campaign.scheduledAt)
   if (scheduled > new Date()) return scheduled
@@ -315,21 +388,21 @@ export function getNextScheduledEvent(campaign: Campaign): Date | null {
 }
 
 export function canStartCampaign(campaign: Campaign): boolean {
-  return ['draft', 'paused'].includes(campaign.status)
+  return ['draft', 'paused', 'scheduled', 'cancelled', 'canceled'].includes(campaign.status)
 }
 
 export function canPauseCampaign(campaign: Campaign): boolean {
-  return campaign.status === 'active'
+  return ['active', 'running'].includes(campaign.status)
 }
 
 export function canCancelCampaign(campaign: Campaign): boolean {
-  return ['draft', 'active', 'paused'].includes(campaign.status)
+  return ['draft', 'active', 'paused', 'scheduled', 'running'].includes(campaign.status)
 }
 
 export function canEditCampaign(campaign: Campaign): boolean {
-  return ['draft', 'paused'].includes(campaign.status)
+  return ['draft', 'paused', 'scheduled'].includes(campaign.status)
 }
 
 export function canDeleteCampaign(campaign: Campaign): boolean {
-  return ['draft', 'done', 'canceled'].includes(campaign.status)
+  return ['draft', 'done', 'completed', 'canceled', 'cancelled', 'failed', 'error'].includes(campaign.status)
 }

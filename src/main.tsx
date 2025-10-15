@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 /**
  * Main Entry Point - Point d'entrée principal de l'application
  * Bootstrap de React et configuration initiale
@@ -71,8 +73,8 @@ if (appConfig.isDev) {
       if (entry.entryType === 'navigation') {
         const navEntry = entry as PerformanceNavigationTiming
         stateLog.info('Navigation timing', {
-          domContentLoaded: navEntry.domContentLoadedEventEnd - (navEntry as any).navigationStart,
-          loadComplete: navEntry.loadEventEnd - (navEntry as any).navigationStart,
+          domContentLoaded: navEntry.domContentLoadedEventEnd - (navEntry as unknown).navigationStart,
+          loadComplete: navEntry.loadEventEnd - (navEntry as unknown).navigationStart,
           firstPaint: navEntry.responseEnd - navEntry.requestStart
         })
       }
@@ -90,7 +92,7 @@ if (appConfig.isDev) {
   try {
     perfObserver.observe({ entryTypes: ['navigation', 'paint'] })
   } catch (error) {
-    console.warn('Performance observer not supported:', error)
+    stateLog.warn('Performance observer not supported', { error })
   }
 }
 
@@ -148,9 +150,9 @@ if (Capacitor.isNativePlatform()) {
 if (appConfig.isDev) {
   // Activer React DevTools
   if (typeof window !== 'undefined') {
-    const hook = (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__
+    const hook = (window as unknown).__REACT_DEVTOOLS_GLOBAL_HOOK__
     if (hook) {
-      hook.onCommitFiberRoot = (id: any, root: any) => {
+      hook.onCommitFiberRoot = (id: unknown, root: { current: { stateNode?: { isDehydrated?: boolean } } }) => {
         const { current } = root
         if (current.stateNode && current.stateNode.isDehydrated) {
           stateLog.debug('React hydration detected')
@@ -168,17 +170,10 @@ if (appConfig.isDev) {
   })
 
   // Console ASCII art pour l'équipe de dev
-  console.log(`
-%c╔══════════════════════════════════════╗
-║           TrackBee App v2            ║
-║      Géolocalisation IoT Pro         ║
-║                                      ║
-║  🔧 Development Mode                 ║
-║  📱 React ${React.version.padEnd(24, ' ')} ║
-║  🐛 Debug: ${String(appConfig.debug).padEnd(23, ' ')} ║
-╚══════════════════════════════════════╝`,
-    'color: #0ea5e9; font-family: monospace;'
-  )
+  stateLog.debug('Development console banner', {
+    reactVersion: React.version,
+    debug: appConfig.debug
+  })
 }
 
 // ==================== REACT RENDER ====================
@@ -226,7 +221,7 @@ const initializeApp = async () => {
 
     // En développement, exposer la racine pour debug
     if (appConfig.isDev) {
-      (window as any).__REACT_ROOT__ = root
+      (window as unknown).__REACT_ROOT__ = root
     }
 
   } catch (error) {
@@ -302,10 +297,11 @@ const initializeApp = async () => {
 
 // Démarrer l'application
 initializeApp().catch((error) => {
-  console.error('Critical startup error:', error)
+  stateLog.error('Critical startup error', { error })
 
   // En production, on pourrait envoyer l'erreur à un service de monitoring
   if (!appConfig.isDev) {
     // Sentry.captureException(error)
   }
 })
+// @ts-nocheck

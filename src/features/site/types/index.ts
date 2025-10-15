@@ -309,11 +309,11 @@ export const isSiteBundle = (obj: unknown): obj is SiteBundle => {
     typeof obj === 'object' &&
     obj !== null &&
     'site' in obj &&
-    typeof (obj as any).site === 'object' &&
+    typeof (obj as Record<string, unknown>).site === 'object' &&
     'installations' in obj &&
-    Array.isArray((obj as any).installations) &&
+    Array.isArray((obj as Record<string, unknown>).installations) &&
     'statistics' in obj &&
-    typeof (obj as any).statistics === 'object'
+    typeof (obj as Record<string, unknown>).statistics === 'object'
   )
 }
 
@@ -499,3 +499,9 @@ export type {
   Campaign,
   Calculation
 } from '@/core/types'
+
+// Hook return types re-exported from hooks to avoid circular deps
+export type {
+  UseGeocodingReturn,
+  UseAddressLookupReturn
+} from '../hooks/useGeocoding'

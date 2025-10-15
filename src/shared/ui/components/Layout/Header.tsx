@@ -8,8 +8,6 @@ import { cn } from '@/shared/utils/cn'
 import { Button } from '@/shared/ui/components/Button/Button'
 import { Badge } from '@/shared/ui/components/Badge/Badge'
 import { ProfileButton } from './ProfileButton'
-import AuthHydrationDiagnostic from '@/debug/AuthHydrationDiagnostic'
-import ComprehensiveHydrationAnalyzer from '@/debug/ComprehensiveHydrationAnalyzer'
 
 // ==================== TYPES ====================
 
@@ -94,12 +92,7 @@ export const Header: React.FC<HeaderProps> = ({
   )
 
   return (
-    <>
-      {/* DEBUG PANELS TEMPORAIRES */}
-      <AuthHydrationDiagnostic />
-      <ComprehensiveHydrationAnalyzer />
-
-      <header
+    <header
         className={cn(
           'sticky top-0 z-40 w-full border-b border-gray-200 dark:border-gray-700',
           'bg-white/95 dark:bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60',
@@ -171,7 +164,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
     </header>
-    </>
   )
 }
 

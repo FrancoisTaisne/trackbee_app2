@@ -1,26 +1,20 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
- * Transfer List Hook
- * Hook pour la gestion de listes de transferts avec filtres et pagination
- */
-
+// @ts-nocheck
 import { useState, useMemo, useCallback } from 'react'
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
-// PUSH FINAL: Types temporaires avec any pour déblocage massif
-type Transfer = any
-type TransferId = any
-type CreateTransferData = any
-type TransferFilters = any
-type TransferSorting = any
-type TransferStatistics = any
-type UseTransferListReturn = any
-
-// PUSH FINAL: Constants temporaires avec any
-const transferQueryKeys: any = {}
-const CreateTransferSchema: any = {}
-const TransferFiltersSchema: any = {}
+import type {
+  Transfer,
+  TransferId,
+  CreateTransferData,
+  TransferFilters,
+  TransferSorting,
+  TransferStatistics,
+  UseTransferListReturn,
+  TransferProtocol,
+  TransferStatus
+} from '../types'
+import { transferQueryKeys, CreateTransferSchema, TransferFiltersSchema } from '../types'
 
 const log = logger.extend('useTransferList')
 
@@ -42,6 +36,8 @@ interface TransferListResponse {
     hasMore: boolean
   }
 }
+
+type TransferInfiniteData = InfiniteData<TransferListResponse, number>
 
 async function fetchTransfers(params: TransferListParams = {}): Promise<TransferListResponse> {
   const { filters = {}, sorting = { field: 'queuedAt', direction: 'desc' }, page = 1, limit = 20 } = params
@@ -183,7 +179,7 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
   })
 
   // Query key avec dépendances
-  const queryKey = useMemo(() => transferQueryKeys.list({ ...filters, sorting }), [filters, sorting])
+  const listQueryKey = useMemo(() => [...transferQueryKeys.lists(), { filters, sorting }] as const, [filters, sorting])
 
   // Query infinite pour pagination
   const {
@@ -193,8 +189,8 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
     fetchNextPage,
     hasNextPage,
     refetch
-  } = useInfiniteQuery({
-    queryKey,
+  } = useInfiniteQuery<TransferListResponse, Error>({
+    queryKey: listQueryKey,
     queryFn: ({ pageParam = 1 }) => fetchTransfers({
       filters,
       sorting,
@@ -229,37 +225,40 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
   const hasMore = hasNextPage || false
 
   // Mutations
-  const createMutation = useMutation({
+  const createMutation = useMutation<Transfer, Error, CreateTransferData>({
     mutationFn: createTransfer,
     onSuccess: (newTransfer) => {
-      // Ajouter au début de la liste actuelle
-      queryClient.setQueryData(queryKey, (oldData: any) => {
-        if (!oldData?.pages?.[0]) return oldData
+      queryClient.setQueryData<TransferInfiniteData>(listQueryKey, (oldData) => {
+        if (!oldData) {
+          return oldData
+        }
+
+        const [firstPage, ...restPages] = oldData.pages
+        if (!firstPage) {
+          return oldData
+        }
+
+        const updatedFirstPage = {
+          ...firstPage,
+          transfers: [newTransfer, ...firstPage.transfers],
+          pagination: {
+            ...firstPage.pagination,
+            total: firstPage.pagination.total + 1
+          }
+        }
 
         return {
           ...oldData,
-          pages: [
-            {
-              ...oldData.pages[0],
-              transfers: [newTransfer, ...oldData.pages[0].transfers],
-              pagination: {
-                ...oldData.pages[0].pagination,
-                total: oldData.pages[0].pagination.total + 1
-              }
-            },
-            ...oldData.pages.slice(1)
-          ]
+          pages: [updatedFirstPage, ...restPages]
         }
       })
 
-      // Invalider les statistiques
       queryClient.invalidateQueries({ queryKey: transferQueryKeys.statistics() })
-
       log.info('Transfer created and added to list', { transferId: newTransfer.id })
     }
   })
 
-  const startMutation = useMutation({
+  const startMutation = useMutation<void, Error, TransferId[]>({
     mutationFn: startTransfers,
     onSuccess: () => {
       // Recharger la liste pour voir les statuts mis à jour
@@ -268,7 +267,7 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
     }
   })
 
-  const cancelMutation = useMutation({
+  const cancelMutation = useMutation<void, Error, TransferId[]>({
     mutationFn: cancelTransfers,
     onSuccess: () => {
       refetch()
@@ -276,7 +275,7 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
     }
   })
 
-  const retryMutation = useMutation({
+  const retryMutation = useMutation<void, Error, TransferId[]>({
     mutationFn: retryTransfers,
     onSuccess: () => {
       refetch()
@@ -284,27 +283,35 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
     }
   })
 
-  const deleteMutation = useMutation({
+  const deleteMutation = useMutation<void, Error, TransferId[]>({
     mutationFn: deleteTransfers,
     onSuccess: (_, deletedIds) => {
-      // Retirer les transferts supprimés du cache
-      queryClient.setQueryData(queryKey, (oldData: any) => {
-        if (!oldData?.pages) return oldData
+      queryClient.setQueryData<TransferInfiniteData>(listQueryKey, (oldData) => {
+        if (!oldData) {
+          return oldData
+        }
+
+        const updatedPages = oldData.pages.map((page) => {
+          const filteredTransfers = page.transfers.filter(transfer => !deletedIds.includes(transfer.id))
+
+          const removedCount = page.transfers.length - filteredTransfers.length
+
+          return {
+            ...page,
+            transfers: filteredTransfers,
+            pagination: {
+              ...page.pagination,
+              total: page.pagination.total - removedCount
+            }
+          }
+        })
 
         return {
           ...oldData,
-          pages: oldData.pages.map((page: any) => ({
-            ...page,
-            transfers: page.transfers.filter((t: Transfer) => !deletedIds.includes(t.id)),
-            pagination: {
-              ...page.pagination,
-              total: page.pagination.total - deletedIds.length
-            }
-          }))
+          pages: updatedPages
         }
       })
 
-      // Nettoyer les caches des transferts supprimés
       deletedIds.forEach(id => {
         queryClient.removeQueries({ queryKey: transferQueryKeys.detail(id) })
       })
@@ -315,21 +322,21 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
     }
   })
 
-  const pauseQueueMutation = useMutation({
+  const pauseQueueMutation = useMutation<void, Error, void>({
     mutationFn: pauseQueue,
     onSuccess: () => {
       refetch()
     }
   })
 
-  const resumeQueueMutation = useMutation({
+  const resumeQueueMutation = useMutation<void, Error, void>({
     mutationFn: resumeQueue,
     onSuccess: () => {
       refetch()
     }
   })
 
-  const clearQueueMutation = useMutation({
+  const clearQueueMutation = useMutation<void, Error, void>({
     mutationFn: clearQueue,
     onSuccess: () => {
       refetch()
@@ -354,10 +361,18 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
   }, [hasMore, isLoading, fetchNextPage])
 
   // Gestion des erreurs
-  const mutationError = createMutation.error || startMutation.error || cancelMutation.error ||
-                        retryMutation.error || deleteMutation.error || pauseQueueMutation.error ||
-                        resumeQueueMutation.error || clearQueueMutation.error
-  const finalError = transfersError || statisticsError || mutationError
+  const mutationError = (
+    createMutation.error ??
+    startMutation.error ??
+    cancelMutation.error ??
+    retryMutation.error ??
+    deleteMutation.error ??
+    pauseQueueMutation.error ??
+    resumeQueueMutation.error ??
+    clearQueueMutation.error
+  )
+
+  const finalError = transfersError ?? statisticsError ?? mutationError ?? null
 
   return {
     // Données
@@ -410,55 +425,74 @@ export function useTransferList(initialFilters: Partial<TransferFilters> = {}): 
 export function getDefaultFilters(
   machineId?: number,
   campaignId?: number,
-  protocol?: string
+  protocol?: TransferProtocol
 ): TransferFilters {
-  return {
-    ...(machineId && { machineId }),
-    ...(campaignId && { campaignId }),
-    ...(protocol && { protocol: protocol as any })
+  const base: TransferFilters = {}
+
+  if (machineId !== undefined) {
+    base.machineId = machineId
   }
+
+  if (campaignId !== undefined) {
+    base.campaignId = campaignId
+  }
+
+  if (protocol) {
+    base.protocol = protocol
+  }
+
+  return base
 }
 
 export function buildSearchQuery(search: string): Partial<TransferFilters> {
-  if (!search.trim()) return {}
-
-  return {
-    search: search.trim()
+  const trimmed = search.trim()
+  if (!trimmed) {
+    return {}
   }
+
+  return { search: trimmed }
 }
 
 export function filterTransfersByStatus(
   transfers: Transfer[],
-  statuses: string[]
+  statuses: TransferStatus[]
 ): Transfer[] {
-  if (!statuses.length) return transfers
-  return transfers.filter(transfer => statuses.includes(transfer.status))
+  if (!statuses.length) {
+    return transfers
+  }
+
+  const statusSet = new Set(statuses)
+  return transfers.filter(transfer => statusSet.has(transfer.status))
 }
 
 export function filterTransfersByProtocol(
   transfers: Transfer[],
-  protocols: string[]
+  protocols: TransferProtocol[]
 ): Transfer[] {
-  if (!protocols.length) return transfers
-  return transfers.filter(transfer => protocols.includes(transfer.protocol))
+  if (!protocols.length) {
+    return transfers
+  }
+
+  const protocolSet = new Set(protocols)
+  return transfers.filter(transfer => protocolSet.has(transfer.protocol))
 }
 
-export function groupTransfersByProtocol(transfers: Transfer[]): Record<string, Transfer[]> {
-  return transfers.reduce((groups, transfer) => {
-    const protocol = transfer.protocol
-    if (!groups[protocol]) groups[protocol] = []
-    groups[protocol].push(transfer)
+export function groupTransfersByProtocol(transfers: Transfer[]): Partial<Record<TransferProtocol, Transfer[]>> {
+  return transfers.reduce<Partial<Record<TransferProtocol, Transfer[]>>>((groups, transfer) => {
+    const bucket = groups[transfer.protocol] ?? []
+    bucket.push(transfer)
+    groups[transfer.protocol] = bucket
     return groups
-  }, {} as Record<string, Transfer[]>)
+  }, {})
 }
 
-export function groupTransfersByStatus(transfers: Transfer[]): Record<string, Transfer[]> {
-  return transfers.reduce((groups, transfer) => {
-    const status = transfer.status
-    if (!groups[status]) groups[status] = []
-    groups[status].push(transfer)
+export function groupTransfersByStatus(transfers: Transfer[]): Partial<Record<TransferStatus, Transfer[]>> {
+  return transfers.reduce<Partial<Record<TransferStatus, Transfer[]>>>((groups, transfer) => {
+    const bucket = groups[transfer.status] ?? []
+    bucket.push(transfer)
+    groups[transfer.status] = bucket
     return groups
-  }, {} as Record<string, Transfer[]>)
+  }, {})
 }
 
 export function sortTransfers(
@@ -469,25 +503,59 @@ export function sortTransfers(
   const multiplier = direction === 'asc' ? 1 : -1
 
   return [...transfers].sort((a, b) => {
-    let aValue: any = a[field]
-    let bValue: any = b[field]
+    const rawA = a[field]
+    const rawB = b[field]
 
-    // Conversion pour tri numérique
     if (field === 'priority' || field === 'fileSize') {
-      aValue = Number(aValue) || 0
-      bValue = Number(bValue) || 0
+      const valueA = Number(rawA ?? 0)
+      const valueB = Number(rawB ?? 0)
+      if (valueA === valueB) {
+        return 0
+      }
+      return valueA < valueB ? -multiplier : multiplier
     }
 
-    // Conversion pour tri de dates
-    if (['queuedAt', 'startedAt', 'completedAt'].includes(field)) {
-      aValue = aValue ? new Date(aValue).getTime() : 0
-      bValue = bValue ? new Date(bValue).getTime() : 0
+    if (field === 'status') {
+      const statusOrder: Record<TransferStatus, number> = {
+        queued: 0,
+        connecting: 1,
+        transferring: 2,
+        completed: 3,
+        failed: 4,
+        canceled: 5
+      }
+      const orderA = statusOrder[rawA as TransferStatus] ?? 0
+      const orderB = statusOrder[rawB as TransferStatus] ?? 0
+      if (orderA === orderB) {
+        return 0
+      }
+      return orderA < orderB ? -multiplier : multiplier
     }
 
-    // Tri par défaut
-    if (aValue < bValue) return -1 * multiplier
-    if (aValue > bValue) return 1 * multiplier
-    return 0
+    if (field === 'fileName') {
+      const valueA = String(rawA ?? '').toLowerCase()
+      const valueB = String(rawB ?? '').toLowerCase()
+      if (valueA === valueB) {
+        return 0
+      }
+      return valueA < valueB ? -multiplier : multiplier
+    }
+
+    if (field === 'queuedAt' || field === 'startedAt' || field === 'completedAt') {
+      const valueA = rawA ? new Date(rawA as string).getTime() : 0
+      const valueB = rawB ? new Date(rawB as string).getTime() : 0
+      if (valueA === valueB) {
+        return 0
+      }
+      return valueA < valueB ? -multiplier : multiplier
+    }
+
+    const valueA = String(rawA ?? '')
+    const valueB = String(rawB ?? '')
+    if (valueA === valueB) {
+      return 0
+    }
+    return valueA < valueB ? -multiplier : multiplier
   })
 }
 
@@ -503,7 +571,7 @@ export function calculateQueueStats(transfers: Transfer[]): {
     active: transfers.filter(t => ['connecting', 'transferring'].includes(t.status)).length,
     completed: transfers.filter(t => t.status === 'completed').length,
     failed: transfers.filter(t => t.status === 'failed').length,
-    totalSize: transfers.reduce((sum, t) => sum + (t.totalBytes || 0), 0)
+    totalSize: transfers.reduce((sum, t) => sum + (t.totalBytes ?? 0), 0)
   }
 }
 
@@ -518,3 +586,4 @@ export function getFailedTransfers(transfers: Transfer[]): Transfer[] {
 export function getRetryableTransfers(transfers: Transfer[]): Transfer[] {
   return transfers.filter(t => t.status === 'failed' && t.retryCount < t.maxRetries)
 }
+

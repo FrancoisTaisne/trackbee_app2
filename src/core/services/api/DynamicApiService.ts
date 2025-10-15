@@ -7,7 +7,7 @@ import type { HttpClient } from './HttpClient'
 import { httpClient } from './HttpClient'
 import { openApiDiscovery, type DiscoveredEndpoint, type DiscoveryResult } from './OpenApiDiscovery'
 import type { ApiResponse } from '@/core/types/transport'
-import { apiLog, logger } from '@/core/utils/logger'
+import { apiLog } from '@/core/utils/logger'
 
 // ==================== TYPES ====================
 
@@ -22,7 +22,7 @@ export interface DynamicEndpoint {
 
 export interface ApiOperation {
   endpoint: DynamicEndpoint
-  call: <T = any>(params?: Record<string, any>, data?: any, options?: any) => Promise<ApiResponse<T>>
+  call: <T = unknown>(params?: Record<string, unknown>, data?: unknown, options?: Record<string, unknown>) => Promise<ApiResponse<T>>
 }
 
 export interface DynamicApiServiceOptions {
@@ -175,7 +175,7 @@ export class DynamicApiService {
 
     const operation: ApiOperation = {
       endpoint,
-      call: async <T = any>(params?: Record<string, any>, data?: any, options?: any): Promise<ApiResponse<T>> => {
+      call: async <T = unknown>(params?: Record<string, unknown>, data?: unknown, options?: Record<string, unknown>): Promise<ApiResponse<T>> => {
         return this.executeOperation<T>(endpoint, params, data, options)
       }
     }
@@ -191,11 +191,11 @@ export class DynamicApiService {
   /**
    * Exécuter une opération API
    */
-  private async executeOperation<T = any>(
+  private async executeOperation<T = unknown>(
     endpoint: DynamicEndpoint,
-    params?: Record<string, any>,
-    data?: any,
-    options?: any
+    params?: Record<string, unknown>,
+    data?: unknown,
+    options?: Record<string, unknown>
   ): Promise<ApiResponse<T>> {
     let url = endpoint.path
 
@@ -286,7 +286,7 @@ export class DynamicApiService {
     return operation.call()
   }
 
-  async createSite(siteData: any): Promise<ApiResponse> {
+  async createSite(siteData: Record<string, unknown>): Promise<ApiResponse> {
     const operation = this.createOperation('/api/site', 'POST')
     if (!operation) {
       throw new Error('Create site endpoint not found')

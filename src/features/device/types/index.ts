@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Device Feature Types
  * Types et schémas de validation pour la gestion des IoT devices TrackBee
@@ -13,7 +12,6 @@ import type {
   Calculation,
   BleConnectionStatus,
   BleDevice,
-  BleCommand,
   BleFileInfo
 } from '@/core/types'
 
@@ -264,11 +262,11 @@ export const isDeviceBundle = (obj: unknown): obj is DeviceBundle => {
     typeof obj === 'object' &&
     obj !== null &&
     'machine' in obj &&
-    typeof (obj as any).machine === 'object' &&
+    typeof (obj as Record<string, unknown>).machine === 'object' &&
     'campaigns' in obj &&
-    Array.isArray((obj as any).campaigns) &&
+    Array.isArray((obj as Record<string, unknown>).campaigns) &&
     'calculations' in obj &&
-    Array.isArray((obj as any).calculations)
+    Array.isArray((obj as Record<string, unknown>).calculations)
   )
 }
 
@@ -379,6 +377,7 @@ export interface DeviceFileDownloadProps {
   campaignId?: number
   onDownloadComplete?: (files: string[]) => void
   onError?: (error: Error) => void
+  className?: string
 }
 
 // ==================== ERROR TYPES ====================
@@ -428,6 +427,5 @@ export type {
   Calculation,
   BleConnectionStatus,
   BleDevice,
-  BleCommand,
   BleFileInfo
 } from '@/core/types'

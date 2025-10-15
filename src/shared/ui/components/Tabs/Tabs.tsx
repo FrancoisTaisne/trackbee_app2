@@ -1,7 +1,7 @@
 /**
  * Tabs - Composant de navigation par onglets
  */
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 
 // Context pour les tabs
 const TabsContext = createContext<{
@@ -15,15 +15,39 @@ const TabsContext = createContext<{
 // Composant principal Tabs
 interface TabsProps {
   children: React.ReactNode
-  defaultValue: string
+  defaultValue?: string
+  value?: string
+  onValueChange?: (value: string) => void
   className?: string
 }
 
-export function Tabs({ children, defaultValue, className = '' }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultValue)
+export function Tabs({
+  children,
+  defaultValue,
+  value,
+  onValueChange,
+  className = ''
+}: TabsProps) {
+  const isControlled = value !== undefined
+  const [internalValue, setInternalValue] = useState(() => value ?? defaultValue ?? '')
+
+  useEffect(() => {
+    if (!isControlled && defaultValue !== undefined) {
+      setInternalValue(defaultValue)
+    }
+  }, [defaultValue, isControlled])
+
+  const activeTab = isControlled ? value ?? '' : internalValue
+
+  const handleSetActiveTab = (tab: string) => {
+    if (!isControlled) {
+      setInternalValue(tab)
+    }
+    onValueChange?.(tab)
+  }
 
   return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab }}>
+    <TabsContext.Provider value={{ activeTab, setActiveTab: handleSetActiveTab }}>
       <div className={`tabs-container ${className}`}>
         {children}
       </div>

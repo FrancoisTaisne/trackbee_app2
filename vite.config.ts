@@ -1,37 +1,32 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'   // <-- AU LIEU DE 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
-// import tailwindcss from "@tailwindcss/vite/dist";
 import tailwindcss from '@tailwindcss/vite'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-// https://vitejs.dev/config/
+const rootDir = dirname(fileURLToPath(import.meta.url))
+
 export default defineConfig({
-  plugins: [react(),tailwindcss()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
-      '@/app': resolve(__dirname, './src/app'),
-      '@/features': resolve(__dirname, './src/features'),
-      '@/shared': resolve(__dirname, './src/shared'),
-      '@/core': resolve(__dirname, './src/core'),
+      '@': resolve(rootDir, './src'),
+      '@/app': resolve(rootDir, './src/app'),
+      '@/features': resolve(rootDir, './src/features'),
+      '@/shared': resolve(rootDir, './src/shared'),
+      '@/core': resolve(rootDir, './src/core'),
     },
   },
-  build: {
-    target: 'esnext',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-query': ['@tanstack/react-query'],
-          'vendor-ui': ['@headlessui/react', 'lucide-react', 'framer-motion'],
-          'vendor-maps': ['leaflet', 'react-leaflet'],
-          'vendor-capacitor': ['@capacitor/core', '@capacitor-community/bluetooth-le'],
-        },
-      },
-    },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    globals: true,
   },
   server: {
     host: '0.0.0.0',
     port: 5180,
+    proxy: {
+      '/api': { target: 'http://localhost:3313', changeOrigin: true, secure: false },
+    },
   },
 })

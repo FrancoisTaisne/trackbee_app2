@@ -287,14 +287,29 @@ export class AppInitializer {
       } else {
         // Sur web, vérifier les permissions disponibles
         if ('permissions' in navigator) {
-          try {
-            // Vérifier les permissions Bluetooth si disponible
-            if ('bluetooth' in navigator) {
-              const bluetoothPermission = await navigator.permissions.query({ name: 'bluetooth' as any })
-              stateLog.debug('Bluetooth permission', { state: bluetoothPermission.state })
+          // Certains navigateurs exposent navigator.permissions sans forcément
+          // accepter le descripteur non standard 'bluetooth'. L'appel direct peut
+          // lever une exception synchrone "Illegal constructor". On encapsule
+          // donc la requête et on ignore silencieusement les erreurs.
+          if ('bluetooth' in navigator) {
+            try {
+              const query = navigator.permissions.query.bind(navigator.permissions)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const maybePromise = query({ name: 'bluetooth' as any }) as unknown
+
+              if (maybePromise && typeof (maybePromise as Promise<PermissionStatus>).then === 'function') {
+                const bluetoothPermission = await (maybePromise as Promise<PermissionStatus>).catch((error) => {
+                  stateLog.debug('Bluetooth permission query rejected', { error })
+                  return undefined
+                })
+
+                if (bluetoothPermission) {
+                  stateLog.debug('Bluetooth permission', { state: bluetoothPermission.state })
+                }
+              }
+            } catch (error) {
+              stateLog.debug('Bluetooth permission query unsupported', { error })
             }
-          } catch (error) {
-            stateLog.debug('Permission check failed', { error })
           }
         }
       }

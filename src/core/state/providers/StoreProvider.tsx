@@ -138,7 +138,8 @@ const useStoreInitialization = () => {
         }
       }
     }
-  }, []) // Pas de dépendances - l'effet ne s'exécute qu'au mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Intentionally empty - only run on mount, stores are accessed via refs
 
   return { isInitialized, initError }
 }
@@ -150,7 +151,6 @@ const useStoreInitialization = () => {
  * Gère les interactions et événements cross-store
  */
 const useStoreSynchronization = () => {
-  const authStore = useAuthStore()
   const deviceStore = useDeviceStore()
   const transferStore = useTransferStore()
   const uiStore = useUIStore()
@@ -239,7 +239,8 @@ const useStoreSynchronization = () => {
       unsubscribeDevice()
       unsubscribeUI()
     }
-  }, []) // Pas de dépendances - l'effet de sync ne s'exécute qu'au mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Intentionally empty - subscriptions set up once on mount
 }
 
 // ==================== ERROR BOUNDARY ====================

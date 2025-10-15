@@ -9,7 +9,6 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import type { AppError } from '@/core/types/transport'
 import { logger } from '@/core/utils/logger'
 import { detectPlatform } from '@/core/utils/env'
-import { idUtils } from '@/core/utils/ids'
 
 // ==================== TYPES ====================
 
@@ -115,7 +114,7 @@ class LocalStorageAdapter extends StorageAdapter {
         total: 10 * 1024 * 1024, // ~10MB typical limit
         itemCount: keys.length
       }
-    } catch (error) {
+    } catch {
       return {
         type: this.type,
         available: false
@@ -192,7 +191,7 @@ class PreferencesAdapter extends StorageAdapter {
         available: this.available,
         itemCount: keys.length
       }
-    } catch (error) {
+    } catch {
       return {
         type: this.type,
         available: false
@@ -277,7 +276,7 @@ class SecureStorageAdapter extends StorageAdapter {
         available: this.available,
         itemCount: keys.length
       }
-    } catch (error) {
+    } catch {
       return {
         type: this.type,
         available: false
@@ -320,7 +319,7 @@ export class StorageManager {
   /**
    * Obtient une valeur depuis le storage
    */
-  async get<T = any>(key: string, options: StorageOptions = {}): Promise<T | null> {
+  async get<T = unknown>(key: string, options: StorageOptions = {}): Promise<T | null> {
     const { type = 'local' } = options
     const adapter = this.getAdapter(type)
 
@@ -346,7 +345,7 @@ export class StorageManager {
   /**
    * Stocke une valeur dans le storage
    */
-  async set(key: string, value: any, options: StorageOptions = {}): Promise<void> {
+  async set(key: string, value: unknown, options: StorageOptions = {}): Promise<void> {
     const { type = 'local' } = options
     const adapter = this.getAdapter(type)
 
@@ -649,7 +648,7 @@ export class StorageManager {
    */
   async setWithFallback(
     key: string,
-    value: any,
+    value: unknown,
     preferredTypes: StorageType[] = ['secure', 'preferences', 'local']
   ): Promise<StorageType> {
     for (const type of preferredTypes) {
@@ -671,7 +670,7 @@ export class StorageManager {
   /**
    * Lecture avec fallback sur plusieurs types de storage
    */
-  async getWithFallback<T = any>(
+  async getWithFallback<T = unknown>(
     key: string,
     storageTypes: StorageType[] = ['secure', 'preferences', 'local']
   ): Promise<{ value: T | null; usedType?: StorageType }> {
@@ -780,17 +779,17 @@ export const storageManager = new StorageManager()
 export const storage = {
   // Local storage (non sécurisé)
   get: (key: string) => storageManager.get(key, { type: 'local' }),
-  set: (key: string, value: any) => storageManager.set(key, value, { type: 'local' }),
+  set: (key: string, value: unknown) => storageManager.set(key, value, { type: 'local' }),
   remove: (key: string) => storageManager.remove(key, { type: 'local' }),
 
   // Secure storage (tokens, etc.)
   getSecure: (key: string) => storageManager.get(key, { type: 'secure' }),
-  setSecure: (key: string, value: any) => storageManager.set(key, value, { type: 'secure' }),
+  setSecure: (key: string, value: unknown) => storageManager.set(key, value, { type: 'secure' }),
   removeSecure: (key: string) => storageManager.remove(key, { type: 'secure' }),
 
   // Preferences (configuration)
   getPreference: (key: string) => storageManager.get(key, { type: 'preferences' }),
-  setPreference: (key: string, value: any) => storageManager.set(key, value, { type: 'preferences' }),
+  setPreference: (key: string, value: unknown) => storageManager.set(key, value, { type: 'preferences' }),
   removePreference: (key: string) => storageManager.remove(key, { type: 'preferences' }),
 
   // Files

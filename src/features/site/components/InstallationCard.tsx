@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * InstallationCard Component - Carte d'une installation device/site
  * Affichage et gestion d'une installation avec actions et statut
@@ -8,12 +7,10 @@ import React, { useCallback, useState } from 'react'
 import {
   Settings,
   MapPin,
-  Bluetooth,
   MoreVertical,
   Edit3,
   Trash2,
   Activity,
-  Calendar,
   ExternalLink,
   Circle
 } from 'lucide-react'
@@ -35,8 +32,7 @@ import { logger } from '@/core/utils/logger'
 import { formatDistanceToNow } from '@/core/utils/time'
 import { cn } from '@/core/utils/cn'
 import type {
-  SiteBundle,
-  UpdateInstallationData
+  SiteBundle
 } from '../types'
 import type { Installation, Machine } from '@/core/types'
 
@@ -383,16 +379,9 @@ export const InstallationCard: React.FC<InstallationCardProps> = ({
         onClose={() => setShowRemoveModal(false)}
         onConfirm={handleConfirmRemove}
         title="Retirer l'installation"
-        message={
-          <>
-            Êtes-vous sûr de vouloir retirer l'installation <strong>{installation.name || `Installation ${installation.id}`}</strong> ?
-            <br /><br />
-            Le device <strong>{machine.name}</strong> ne sera plus associé à ce site.
-            Les campagnes et calculs existants seront conservés.
-          </>
-        }
+        message={`Êtes-vous sûr de vouloir retirer l'installation ${installation.name || `Installation ${installation.id}`} ? Le device ${machine.name} ne sera plus associé à ce site. Les campagnes et calculs existants seront conservés.`}
         confirmText="Retirer"
-        confirmVariant="danger"
+        variant="danger"
       />
     </>
   )

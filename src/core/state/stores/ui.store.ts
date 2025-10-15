@@ -30,7 +30,7 @@ interface ToastMessage {
 interface ModalState {
   id: string
   type: string
-  props?: Record<string, any>
+  props?: Record<string, unknown>
   persistent?: boolean
   onClose?: () => void
 }
@@ -77,7 +77,7 @@ interface UIState {
   errors: Map<string, {
     id: string
     error: Error
-    context?: Record<string, any>
+    context?: Record<string, unknown>
     timestamp: Date
     acknowledged: boolean
   }>
@@ -94,7 +94,7 @@ interface UIState {
     level: string
     module: string
     message: string
-    data?: any
+    data?: unknown
   }>
 }
 
@@ -136,7 +136,7 @@ interface UIActions {
   clearHistory: () => void
 
   // Erreurs
-  reportError: (error: Error, context?: Record<string, any>) => string
+  reportError: (error: Error, context?: Record<string, unknown>) => string
   acknowledgeError: (id: string) => void
   clearErrors: () => void
 
@@ -197,7 +197,7 @@ const initialState: UIState = {
 
   // Performance
   performanceMode: platform.isMobile ? 'battery-saver' : 'normal',
-  animationsEnabled: !(platform as any).isLowEnd,
+  animationsEnabled: !platform.isMobile,
   autoRefreshEnabled: true,
 
   // Debug

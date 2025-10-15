@@ -201,27 +201,28 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(
                 <Dialog.Panel
                   ref={ref}
                   className={cn(
-                    'w-full transform overflow-hidden rounded-lg',
-                    'bg-white dark:bg-gray-800',
-                    'text-left align-middle shadow-xl transition-all',
+                    'w-full transform overflow-hidden rounded',
+                    'bg-white dark:bg-gray-900',
+                    'border border-gray-200 dark:border-gray-800',
+                    'text-left align-middle shadow-lg transition-all',
                     sizeClasses[size],
                     className
                   )}
                 >
                   {/* Header */}
                   {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between p-6 pb-4">
+                    <div className="flex items-center justify-between p-4 pb-3 border-b border-gray-200 dark:border-gray-800">
                       <div className="flex-1 min-w-0">
                         {title && (
                           <Dialog.Title
                             as="h3"
-                            className="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100"
+                            className="text-sm font-semibold leading-tight text-gray-900 dark:text-gray-100"
                           >
                             {title}
                           </Dialog.Title>
                         )}
                         {description && (
-                          <Dialog.Description className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Dialog.Description className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                             {description}
                           </Dialog.Description>
                         )}
@@ -231,16 +232,16 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(
                         <button
                           type="button"
                           className={cn(
-                            'ml-4 rounded-md p-2 text-gray-400 hover:text-gray-600',
-                            'hover:bg-gray-100 dark:hover:bg-gray-700',
-                            'focus:outline-none focus:ring-2 focus:ring-trackbee-500',
-                            'transition-colors duration-200'
+                            'ml-3 rounded p-1 text-gray-400 hover:text-gray-600',
+                            'hover:bg-gray-100 dark:hover:bg-gray-800',
+                            'focus:outline-none focus:ring-1 focus:ring-trackbee-500',
+                            'transition-colors duration-150'
                           )}
                           onClick={onClose}
                         >
                           <span className="sr-only">Fermer</span>
                           <svg
-                            className="h-5 w-5"
+                            className="h-4 w-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -260,15 +261,15 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(
                   {/* Content */}
                   <div
                     className={cn(
-                      'px-6',
-                      !title && !showCloseButton && 'pt-6',
-                      !actions && 'pb-6',
+                      'px-4',
+                      !title && !showCloseButton && 'pt-4',
+                      !actions && 'pb-4',
                       contentClassName
                     )}
                   >
                     {loading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-trackbee-500" />
+                      <div className="flex items-center justify-center py-6">
+                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-trackbee-500" />
                       </div>
                     ) : (
                       children
@@ -277,8 +278,8 @@ export const Modal = forwardRef<HTMLDivElement, ModalProps>(
 
                   {/* Footer/Actions */}
                   {actions && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4">
-                      <div className="flex justify-end space-x-3">
+                    <div className="border-t border-gray-200 dark:border-gray-800 px-4 py-3">
+                      <div className="flex justify-end space-x-2">
                         {actions}
                       </div>
                     </div>

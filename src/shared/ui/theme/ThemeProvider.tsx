@@ -3,7 +3,7 @@
  * Provider pour la gestion centralisée du thème avec persistance
  */
 
-import React, { createContext, useContext, useEffect, type ReactNode } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useUIStore } from '@/core/state/stores/ui.store'
 import { detectPlatform } from '@/core/utils/env'
 import { stateLog } from '@/core/utils/logger'
@@ -54,16 +54,20 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
   const setTheme = uiStore.setTheme
   const toggleTheme = uiStore.toggleTheme
 
-  const [isSystemDark, setIsSystemDark] = React.useState(false)
-  const [resolvedTheme, setResolvedTheme] = React.useState<'light' | 'dark'>('light')
+  const [isSystemDark, setIsSystemDark] = useState(false)
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
 
   // ==================== SYSTEM THEME DETECTION ====================
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
-    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-      const systemIsDark = e.matches
+    const handleSystemThemeChange = (event: { matches: boolean }) => {
+      const systemIsDark = event.matches
       setIsSystemDark(systemIsDark)
 
       stateLog.debug('System theme changed', {
@@ -72,10 +76,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
       })
     }
 
-    // État initial
     setIsSystemDark(mediaQuery.matches)
 
-    // Écouter les changements
     if (enableSystem) {
       mediaQuery.addEventListener('change', handleSystemThemeChange)
     }
@@ -89,7 +91,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 
   // ==================== THEME RESOLUTION ====================
 
-  React.useEffect(() => {
+  useEffect(() => {
     const resolveTheme = (): 'light' | 'dark' => {
       switch (theme) {
         case 'dark':
@@ -115,10 +117,41 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     }
   }, [theme, isSystemDark, resolvedTheme])
 
+  // ==================== MOBILE STATUS BAR ====================
+
+  const updateStatusBarColor = useCallback((nextTheme: 'light' | 'dark'): void => {
+    const platform = detectPlatform()
+
+    if (platform.isCapacitor && typeof document !== 'undefined') {
+      // Mettre à jour la couleur de la barre de statut sur mobile
+      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
+      const metaStatusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+
+      const colors = {
+        light: '#ffffff',
+        dark: '#111827'
+      }
+
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute('content', colors[nextTheme])
+      }
+
+      if (metaStatusBar) {
+        metaStatusBar.setAttribute('content', nextTheme === 'dark' ? 'black-translucent' : 'default')
+      }
+
+      stateLog.debug('Mobile status bar updated', { theme: nextTheme, color: colors[nextTheme] })
+    }
+  }, [])
+
   // ==================== DOM APPLICATION ====================
 
-  React.useEffect(() => {
-    const root = window.document.documentElement
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    const root = document.documentElement
 
     // Désactiver temporairement les transitions si demandé
     if (disableTransitionOnChange) {
@@ -137,47 +170,20 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
 
     // Rétablir les transitions après un délai
     if (disableTransitionOnChange) {
-      const timeoutId = setTimeout(() => {
+      const timeoutId = globalThis.setTimeout(() => {
         root.style.removeProperty('transition')
       }, 1)
 
-      return () => clearTimeout(timeoutId)
+      return () => globalThis.clearTimeout(timeoutId)
     }
 
     // Return vide pour les cas où disableTransitionOnChange est false
     return () => {}
-  }, [resolvedTheme, disableTransitionOnChange])
-
-  // ==================== MOBILE STATUS BAR ====================
-
-  const updateStatusBarColor = (theme: 'light' | 'dark'): void => {
-    const platform = detectPlatform()
-
-    if (platform.isCapacitor) {
-      // Mettre à jour la couleur de la barre de statut sur mobile
-      const metaThemeColor = document.querySelector('meta[name="theme-color"]')
-      const metaStatusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
-
-      const colors = {
-        light: '#ffffff',
-        dark: '#111827'
-      }
-
-      if (metaThemeColor) {
-        metaThemeColor.setAttribute('content', colors[theme])
-      }
-
-      if (metaStatusBar) {
-        metaStatusBar.setAttribute('content', theme === 'dark' ? 'black-translucent' : 'default')
-      }
-
-      stateLog.debug('Mobile status bar updated', { theme, color: colors[theme] })
-    }
-  }
+  }, [resolvedTheme, disableTransitionOnChange, updateStatusBarColor])
 
   // ==================== INITIALIZATION ====================
 
-  React.useEffect(() => {
+  useEffect(() => {
     stateLog.debug('🎨 ThemeProvider initialized', {
       defaultTheme,
       enableSystem,
@@ -189,17 +195,17 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({
     if (!theme) {
       setTheme(defaultTheme)
     }
-  }, [])
+  }, [defaultTheme, enableSystem, theme, setTheme, isSystemDark])
 
   // ==================== CONTEXT VALUE ====================
 
-  const contextValue: ThemeContextType = {
+  const contextValue = useMemo<ThemeContextType>(() => ({
     theme,
     resolvedTheme,
     setTheme,
     toggleTheme,
     isSystemDark
-  }
+  }), [theme, resolvedTheme, setTheme, toggleTheme, isSystemDark])
 
   return (
     <ThemeContext.Provider value={contextValue}>
@@ -299,8 +305,12 @@ export const getThemeClass = (
   if (!theme) {
     // Cette fonction ne peut pas utiliser useTheme car elle peut être appelée hors composant
     // On va donc supposer le thème depuis le DOM
-    const isDark = document.documentElement.classList.contains('dark')
-    theme = isDark ? 'dark' : 'light'
+    if (typeof document !== 'undefined') {
+      const isDark = document.documentElement.classList.contains('dark')
+      theme = isDark ? 'dark' : 'light'
+    } else {
+      theme = 'light'
+    }
   }
 
   return theme === 'dark' ? darkClass : lightClass
@@ -312,19 +322,20 @@ export const getThemeClass = (
  * Hook pour détecter le thème système
  */
 export const useSystemTheme = (): 'light' | 'dark' => {
-  const [systemTheme, setSystemTheme] = React.useState<'light' | 'dark'>('light')
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>('light')
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
     const updateSystemTheme = () => {
       setSystemTheme(mediaQuery.matches ? 'dark' : 'light')
     }
 
-    // État initial
     updateSystemTheme()
-
-    // Écouter les changements
     mediaQuery.addEventListener('change', updateSystemTheme)
 
     return () => {

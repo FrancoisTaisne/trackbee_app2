@@ -96,7 +96,7 @@ export class DeviceRepository {
           installation,
           site,
           status: this.determineDeviceStatus(machine, installation),
-          lastSeen: machine.lastSeen ? new Date(machine.lastSeen) : undefined,
+          lastSeen: machine.lastSeen ? (machine.lastSeen instanceof Date ? machine.lastSeen : new Date(machine.lastSeen)) : undefined,
           batteryLevel: machine.batteryLevel,
           signalStrength: machine.signalStrength
         }
@@ -286,7 +286,6 @@ export class DeviceRepository {
     machine: Machine,
     installation?: Installation
   ): DeviceBundle['status'] {
-    // Logique de détermination du statut
     if (machine.status === 'maintenance') return 'maintenance'
     if (machine.status === 'error') return 'error'
     if (!installation) return 'inactive'

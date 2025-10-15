@@ -6,8 +6,6 @@
 import type { HttpClient } from './HttpClient'
 import { httpClient } from './HttpClient'
 import { apiLog, logger } from '@/core/utils/logger'
-import { appConfig } from '@/core/utils/env'
-import type { ApiResponse } from '@/core/types/transport'
 
 // ==================== TYPES ====================
 
@@ -49,7 +47,7 @@ export interface OpenApiParameter {
   required?: boolean
   schema: OpenApiSchema
   description?: string
-  example?: any
+  example?: unknown
 }
 
 export interface OpenApiRequestBody {
@@ -71,10 +69,10 @@ export interface OpenApiSchema {
   properties?: Record<string, OpenApiSchema>
   items?: OpenApiSchema
   required?: string[]
-  example?: any
+  example?: unknown
   description?: string
   format?: string
-  enum?: any[]
+  enum?: unknown[]
   pattern?: string
   minimum?: number
   maximum?: number

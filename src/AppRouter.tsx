@@ -15,6 +15,9 @@ const LandingPage = React.lazy(() => import('@/features/landing/pages/LandingPag
 const LoginPage = React.lazy(() => import('@/features/auth/pages/LoginPage'))
 const RegisterPage = React.lazy(() => import('@/features/auth/pages/RegisterPage'))
 
+// 🧪 TEST - Page de test login
+const TestLoginDirect = React.lazy(() => import('./TestLoginDirect').then(m => ({ default: m.TestLoginDirect })))
+
 // Pages protégées - Dashboard
 const DashboardPage = React.lazy(() => import('@/features/dashboard/pages/DashboardPage'))
 
@@ -27,7 +30,7 @@ const SitesListPage = React.lazy(() => import('@/features/site/pages/SitesListPa
 const SiteDetailPage = React.lazy(() => import('@/features/site/pages/SiteDetailPage'))
 
 // Pages protégées - Campaigns
-const CampaignsListPage = React.lazy(() => import('@/features/campaign/pages/CampaignsListPage'))
+const CampaignListPage = React.lazy(() => import('@/features/campaign/pages/CampaignListPage'))
 const CampaignDetailPage = React.lazy(() => import('@/features/campaign/pages/CampaignDetailPage'))
 
 // Pages protégées - Processing
@@ -100,6 +103,10 @@ const publicRoutes = [
   {
     path: '/register',
     element: <RegisterPage />
+  },
+  {
+    path: '/test-login',
+    element: <TestLoginDirect />
   }
 ]
 
@@ -132,7 +139,7 @@ const protectedRoutes = [
   // Routes Campaigns
   {
     path: 'campaigns',
-    element: <CampaignsListPage />
+    element: <CampaignListPage />
   },
   {
     path: 'campaigns/:campaignId',

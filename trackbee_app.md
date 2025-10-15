@@ -17,29 +17,22 @@ TrackBee App2 est une application mobile React + TypeScript pour la gestion prof
 
 ## 🏗️ Architecture Application
 
-### Structure Feature-Based
+### Structure Feature-Based (réelle)
 ```
 src/
 ├── core/                    # Infrastructure layer
 │   ├── database/            # Dexie IndexedDB + repositories
 │   ├── orchestrator/        # Event Bus + Transfer orchestration
-│   ├── services/            # BLE, HTTP, Storage managers
+│   ├── services/            # BLE, HTTP, Storage, WiFi
 │   ├── state/               # TanStack Query + Zustand stores
-│   ├── types/               # TypeScript definitions strictes
-│   └── utils/               # Logger, time, validation utilities
-├── features/                # Business domain features
-│   ├── auth/                # Authentication & session management
-│   ├── device/              # IoT device management (BLE)
-│   ├── site/                # Geographic sites & mapping
-│   ├── campaign/            # GNSS campaigns & scheduling
-│   ├── transfer/            # File transfers (BLE→WiFi→Cloud)
-│   └── processing/          # Post-processing results
-├── shared/                  # Shared UI components & utilities
-│   └── ui/                  # Design system components
-└── app/                     # Application setup & routing
-    ├── App.tsx              # Main component + providers
-    ├── router.tsx           # React Router v6 + guards
-    └── providers/           # Context providers wrapper
+│   ├── types/               # Types partagés
+│   └── utils/               # Logger, env, ids, format, time
+├── features/                # Domaines métier (auth, device, site…)
+├── shared/                  # UI réutilisable (components, pages, theme)
+├── App.tsx                  # Entrée UI + providers
+├── AppRouter.tsx            # Routing + guards
+├── AppInitializer.ts        # Bootstrap services (DB, logs…)
+└── main.tsx                 # Bootstrap Vite/React
 ```
 
 ### Philosophie Event-Driven
@@ -150,10 +143,10 @@ class StorageManager {
   type: 'local' | 'secure' | 'preferences'
 
   // Capacitor integration
-  // → Secure storage pour tokens
-  // → Preferences pour settings
-  // → Local storage pour cache
-}
+  // → Preferences pour tokens et settings (prefix "secure_" pour valeurs sensibles)
+  // → Local storage pour cache web
+  // → Filesystem pour fichiers volumineux si nécessaire
+  }
 ```
 
 ### State Management Pattern

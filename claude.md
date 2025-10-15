@@ -4,7 +4,7 @@
 
 ### TrackBee Ecosystem Components
 - **TrackBee App (Current)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\2.Front\trackbee_app2`
-- **TrackBee IoT (ESP32-C6)**: `C:\Users\fanjo\workspace\trackbee_v6`
+- **TrackBee IoT (ESP32-C6 v7)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\1.IOT\3.Code\trackbee_v7`
 - **TrackBee Backend (Node.js)**: `C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\3.Back\trackbee_back2\src\route`
 
 ---
@@ -145,13 +145,19 @@ npm run migrate              # Database migrations
 
 ### TrackBee IoT Development
 ```bash
-cd C:\Users\fanjo\workspace\trackbee_v6
+cd "C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\1.IOT\3.Code\trackbee_v7"
 
 # ESP-IDF Development
 idf.py build                  # Build firmware
 idf.py flash -p COM3          # Flash to ESP32-C6
 idf.py monitor                # Monitor logs
 idf.py menuconfig            # Configuration
+
+# BLE Testing (from app directory)
+cd "C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\2.Front\trackbee_app2"
+python scriptClaude/ble_scan_only.py              # Quick device scan
+python scriptClaude/ble_automated_test.py         # Automated protocol test
+python scriptClaude/ble_complete_test.py          # Comprehensive test suite
 ```
 
 ---

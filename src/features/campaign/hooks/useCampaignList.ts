@@ -1,11 +1,10 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
-/**
+﻿/**
  * Campaign List Hook
  * Hook pour la gestion de listes de campagnes avec filtres et pagination
  */
 
 import { useState, useMemo, useCallback } from 'react'
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { httpClient } from '@/core/services/api/HttpClient'
 import { logger } from '@/core/utils/logger'
 import type {
@@ -14,7 +13,7 @@ import type {
 } from '../types'
 import { campaignQueryKeys, CreateCampaignSchema, CampaignFiltersSchema } from '../types'
 
-const log = logger.extend('useCampaignList')
+const log = logger.extend('campaign')
 
 // ==================== API FUNCTIONS ====================
 
@@ -38,16 +37,16 @@ interface CampaignListResponse {
 async function fetchCampaigns(params: CampaignListParams = {}): Promise<CampaignListResponse> {
   const { filters = {}, sorting = { field: 'createdAt', direction: 'desc' }, page = 1, limit = 20 } = params
 
-  log.debug('🔄 Fetching campaigns from IndexedDB...', { params })
+  log.debug('ðŸ”„ Fetching campaigns from IndexedDB...', { params })
 
   try {
-    // Import du service centralisé pour accès aux données locales
+    // Import du service centralisÃ© pour accÃ¨s aux donnÃ©es locales
     const { DataService } = await import('@/core/services/data/DataService')
 
-    // Récupérer toutes les campagnes depuis IndexedDB
+    // RÃ©cupÃ©rer toutes les campagnes depuis IndexedDB
     const allCampaigns = await DataService.getAllCampaigns()
 
-    // Appliquer les filtres côté client
+    // Appliquer les filtres cÃ´tÃ© client
     let filteredCampaigns = allCampaigns
 
     // Filtrage par site
@@ -90,7 +89,7 @@ async function fetchCampaigns(params: CampaignListParams = {}): Promise<Campaign
     // Tri
     const sortedCampaigns = sortCampaigns(filteredCampaigns, sorting)
 
-    // Pagination côté client
+    // Pagination cÃ´tÃ© client
     const startIndex = (page - 1) * limit
     const endIndex = startIndex + limit
     const campaigns = sortedCampaigns.slice(startIndex, endIndex)
@@ -105,7 +104,7 @@ async function fetchCampaigns(params: CampaignListParams = {}): Promise<Campaign
       }
     }
 
-    log.info('✅ Campaigns loaded from IndexedDB', {
+    log.info('âœ… Campaigns loaded from IndexedDB', {
       count: campaigns.length,
       total: response.pagination.total,
       hasMore: response.pagination.hasMore
@@ -114,10 +113,10 @@ async function fetchCampaigns(params: CampaignListParams = {}): Promise<Campaign
     return response
 
   } catch (error) {
-    log.error('❌ Failed to fetch campaigns from IndexedDB', { error })
+    log.error('âŒ Failed to fetch campaigns from IndexedDB', { error })
 
-    // Fallback: essayer de récupérer depuis l'API si la DB locale échoue
-    log.warn('🔄 Falling back to API for campaigns...')
+    // Fallback: essayer de rÃ©cupÃ©rer depuis l'API si la DB locale Ã©choue
+    log.warn('ðŸ”„ Falling back to API for campaigns...')
 
     try {
       const searchParams = new URLSearchParams()
@@ -146,19 +145,20 @@ async function fetchCampaigns(params: CampaignListParams = {}): Promise<Campaign
       searchParams.append('limit', limit.toString())
 
       const response = await httpClient.get<CampaignListResponse>(`/api/campaigns?${searchParams}`)
+      const data = response.data!
 
-      log.warn('⚠️ Campaigns loaded from API fallback', {
-        count: response.campaigns.length,
-        total: response.pagination.total,
-        hasMore: response.pagination.hasMore
+      log.warn('âš ï¸ Campaigns loaded from API fallback', {
+        count: data.campaigns.length,
+        total: data.pagination.total,
+        hasMore: data.pagination.hasMore
       })
 
-      return response
+      return data
 
     } catch (apiError) {
-      log.error('❌ Both IndexedDB and API failed for campaigns', { apiError })
+      log.error('âŒ Both IndexedDB and API failed for campaigns', { apiError })
 
-      // Retourner une réponse vide en cas d'échec total
+      // Retourner une rÃ©ponse vide en cas d'Ã©chec total
       return {
         campaigns: [],
         pagination: {
@@ -176,7 +176,8 @@ async function createCampaign(data: CreateCampaignData): Promise<Campaign> {
   log.debug('createCampaign', { data })
 
   const validated = CreateCampaignSchema.parse(data)
-  const campaign = await httpClient.post<Campaign>('/api/campaigns', validated)
+  const response = await httpClient.post<Campaign>('/api/campaigns', validated)
+  const campaign = response.data!
 
   log.info('Campaign created', { campaignId: campaign.id, type: campaign.type })
   return campaign
@@ -185,7 +186,8 @@ async function createCampaign(data: CreateCampaignData): Promise<Campaign> {
 async function duplicateCampaign(campaignId: CampaignId): Promise<Campaign> {
   log.debug('duplicateCampaign', { campaignId })
 
-  const campaign = await httpClient.post<Campaign>(`/api/campaigns/${campaignId}/duplicate`)
+  const response = await httpClient.post<Campaign>(`/api/campaigns/${campaignId}/duplicate`)
+  const campaign = response.data!
 
   log.info('Campaign duplicated', { originalId: campaignId, newId: campaign.id })
   return campaign
@@ -204,7 +206,7 @@ async function deleteCampaigns(campaignIds: CampaignId[]): Promise<void> {
 export function useCampaignList(initialFilters: Partial<CampaignFilters> = {}): UseCampaignListReturn {
   const queryClient = useQueryClient()
 
-  // État local pour filtres et tri
+  // Ã‰tat local pour filtres et tri
   const [filters, setFiltersState] = useState<CampaignFilters>(() => {
     const validated = CampaignFiltersSchema.parse(initialFilters)
     return validated
@@ -215,8 +217,8 @@ export function useCampaignList(initialFilters: Partial<CampaignFilters> = {}): 
     direction: 'desc'
   })
 
-  // Query key avec dépendances
-  const queryKey = useMemo(() => campaignQueryKeys.list({ ...filters, sorting }), [filters, sorting])
+  // Query key avec dÃ©pendances
+  const queryKey = useMemo(() => [...campaignQueryKeys.list(filters), { sorting }] as const, [filters, sorting])
 
   // Query infinite pour pagination
   const {
@@ -234,15 +236,14 @@ export function useCampaignList(initialFilters: Partial<CampaignFilters> = {}): 
       page: pageParam,
       limit: 20
     }),
-    getNextPageParam: (lastPage, pages) => {
-      return lastPage.pagination.hasMore ? pages.length + 1 : undefined
-    },
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.hasMore ? lastPage.pagination.page + 1 : undefined,
     initialPageParam: 1,
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000     // 5 minutes
   })
 
-  // Aplatir les résultats de pagination
+  // Aplatir les rÃ©sultats de pagination
   const campaigns = useMemo(() => {
     return data?.pages.flatMap(page => page.campaigns) || []
   }, [data])
@@ -253,23 +254,25 @@ export function useCampaignList(initialFilters: Partial<CampaignFilters> = {}): 
   const createMutation = useMutation({
     mutationFn: createCampaign,
     onSuccess: (newCampaign) => {
-      // Ajouter au début de la liste actuelle
-      queryClient.setQueryData(queryKey, (oldData: any) => {
-        if (!oldData?.pages?.[0]) return oldData
+      // Ajouter au dÃ©but de la liste actuelle
+      queryClient.setQueryData<InfiniteData<CampaignListResponse>>(queryKey, (oldData) => {
+        if (!oldData?.pages?.length) return oldData
+
+        const [firstPage, ...restPages] = oldData.pages as CampaignListResponse[]
+        if (!firstPage) return oldData
+
+        const updatedFirstPage: CampaignListResponse = {
+          ...firstPage,
+          campaigns: [newCampaign, ...firstPage.campaigns],
+          pagination: {
+            ...firstPage.pagination,
+            total: firstPage.pagination.total + 1
+          }
+        }
 
         return {
           ...oldData,
-          pages: [
-            {
-              ...oldData.pages[0],
-              campaigns: [newCampaign, ...oldData.pages[0].campaigns],
-              pagination: {
-                ...oldData.pages[0].pagination,
-                total: oldData.pages[0].pagination.total + 1
-              }
-            },
-            ...oldData.pages.slice(1)
-          ]
+          pages: [updatedFirstPage, ...restPages]
         }
       })
 
@@ -291,24 +294,26 @@ export function useCampaignList(initialFilters: Partial<CampaignFilters> = {}): 
   const deleteMutation = useMutation({
     mutationFn: deleteCampaigns,
     onSuccess: (_, deletedIds) => {
-      // Retirer les campagnes supprimées du cache
-      queryClient.setQueryData(queryKey, (oldData: any) => {
+      // Retirer les campagnes supprimÃ©es du cache
+      queryClient.setQueryData<InfiniteData<CampaignListResponse>>(queryKey, (oldData) => {
         if (!oldData?.pages) return oldData
+
+        const updatedPages = oldData.pages.map((page) => ({
+          ...page,
+          campaigns: page.campaigns.filter(c => !deletedIds.includes(c.id)),
+          pagination: {
+            ...page.pagination,
+            total: Math.max(0, page.pagination.total - deletedIds.length)
+          }
+        }))
 
         return {
           ...oldData,
-          pages: oldData.pages.map((page: any) => ({
-            ...page,
-            campaigns: page.campaigns.filter((c: Campaign) => !deletedIds.includes(c.id)),
-            pagination: {
-              ...page.pagination,
-              total: page.pagination.total - deletedIds.length
-            }
-          }))
+          pages: updatedPages
         }
       })
 
-      // Nettoyer les caches des campagnes supprimées
+      // Nettoyer les caches des campagnes supprimÃ©es
       deletedIds.forEach(id => {
         queryClient.removeQueries({ queryKey: campaignQueryKeys.detail(id) })
       })
@@ -341,7 +346,7 @@ export function useCampaignList(initialFilters: Partial<CampaignFilters> = {}): 
   const finalError = error || mutationError
 
   return {
-    // Données
+    // DonnÃ©es
     campaigns,
     isLoading: isLoading || createMutation.isPending,
     error: finalError,
@@ -415,24 +420,35 @@ export function sortCampaigns(
   const multiplier = direction === 'asc' ? 1 : -1
 
   return [...campaigns].sort((a, b) => {
-    let aValue: any = a[field]
-    let bValue: any = b[field]
-
-    // Conversion pour tri numérique
     if (field === 'priority') {
-      aValue = Number(aValue) || 0
-      bValue = Number(bValue) || 0
+      const aPriority = typeof a.priority === 'number' ? a.priority : Number(a.priority ?? 0)
+      const bPriority = typeof b.priority === 'number' ? b.priority : Number(b.priority ?? 0)
+      return (aPriority - bPriority) * multiplier
     }
 
-    // Conversion pour tri de dates
-    if (['createdAt', 'scheduledAt'].includes(field)) {
-      aValue = aValue ? new Date(aValue).getTime() : 0
-      bValue = bValue ? new Date(bValue).getTime() : 0
+    if (field === 'createdAt' || field === 'scheduledAt') {
+      const aValue = a[field]
+      const bValue = b[field]
+
+      const aTime = typeof aValue === 'string' || aValue instanceof Date
+        ? new Date(aValue).getTime()
+        : 0
+      const bTime = typeof bValue === 'string' || bValue instanceof Date
+        ? new Date(bValue).getTime()
+        : 0
+
+      return (aTime - bTime) * multiplier
     }
 
-    // Tri par défaut
-    if (aValue < bValue) return -1 * multiplier
-    if (aValue > bValue) return 1 * multiplier
+    const aText = typeof a[field] === 'string' ? (a[field] as string).toLowerCase() : String(a[field] ?? '')
+    const bText = typeof b[field] === 'string' ? (b[field] as string).toLowerCase() : String(b[field] ?? '')
+
+    if (aText < bText) return -1 * multiplier
+    if (aText > bText) return 1 * multiplier
     return 0
   })
 }
+
+
+
+

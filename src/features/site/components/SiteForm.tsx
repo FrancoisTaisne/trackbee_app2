@@ -1,10 +1,9 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * SiteForm Component - Formulaire de création/édition de site
  * Interface complète avec géocodage, validation et prévisualisation carte
  */
 
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -12,7 +11,6 @@ import {
   Search,
   Navigation,
   Check,
-  X,
   AlertCircle,
   Globe,
   Lock,
@@ -40,7 +38,6 @@ import {
 import { useAddressLookup } from '../hooks/useGeocoding'
 import { SiteMapView } from './SiteMapView'
 import { logger } from '@/core/utils/logger'
-import { cn } from '@/core/utils/cn'
 import type {
   SiteFormProps,
   CreateSiteData,
@@ -183,7 +180,6 @@ const CoordinateInput: React.FC<CoordinateInputProps> = ({
           <Switch
             checked={manualMode}
             onCheckedChange={setManualMode}
-            size="sm"
           />
           <span className="text-sm text-gray-600">
             {manualMode ? 'Manuel' : 'Automatique'}
@@ -231,7 +227,6 @@ const CoordinateInput: React.FC<CoordinateInputProps> = ({
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={onGetCurrentPosition}
             disabled={isGettingPosition}
             leftIcon={isGettingPosition ?
@@ -346,6 +341,7 @@ export const SiteForm: React.FC<SiteFormProps> = ({
     setIsGettingPosition(true)
     setCoordinateError(undefined)
 
+    // eslint-disable-next-line no-undef
     const options: PositionOptions = {
       enableHighAccuracy: true,
       timeout: 15000,
@@ -534,8 +530,7 @@ export const SiteForm: React.FC<SiteFormProps> = ({
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  onClick={() => setShowMapPreview(true)}
+                        onClick={() => setShowMapPreview(true)}
                   leftIcon={<MapPin className="w-4 h-4" />}
                 >
                   Aperçu carte
@@ -641,10 +636,12 @@ export const SiteForm: React.FC<SiteFormProps> = ({
           onClose={() => setShowMapPreview(false)}
           size="xl"
         >
-          <ModalHeader
-            title="Aperçu sur la carte"
-            description={`Position du site "${watchedValues.name}"`}
-          />
+          <ModalHeader>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Aperçu sur la carte</h2>
+              <p className="text-sm text-gray-500">Position du site "{watchedValues.name}"</p>
+            </div>
+          </ModalHeader>
           <ModalContent>
             <SiteMapView
               sites={[previewSiteBundle]}

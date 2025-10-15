@@ -1,4 +1,3 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Campaign Scheduler Hook
  * Hook pour la gestion de la planification des campagnes (immédiate/programmée/récurrente)
@@ -37,7 +36,8 @@ async function fetchScheduledCampaigns(params: ScheduledCampaignsParams = {}): P
     searchParams.append('dateTo', params.dateRange.to)
   }
 
-  const campaigns = await httpClient.get<Campaign[]>(`/api/campaigns/scheduled?${searchParams}`)
+  const response = await httpClient.get<Campaign[]>(`/api/campaigns/scheduled?${searchParams}`)
+  const campaigns = response.data!
 
   log.info('Scheduled campaigns loaded', { count: campaigns.length })
   return campaigns
@@ -54,7 +54,8 @@ async function fetchUpcomingEvents(params: ScheduledCampaignsParams = {}): Promi
     searchParams.append('dateTo', params.dateRange.to)
   }
 
-  const events = await httpClient.get<ScheduledEvent[]>(`/api/campaigns/events?${searchParams}`)
+  const response = await httpClient.get<ScheduledEvent[]>(`/api/campaigns/events?${searchParams}`)
+  const events = response.data!
 
   log.info('Upcoming events loaded', { count: events.length })
   return events
@@ -68,7 +69,8 @@ async function scheduleImmediate(data: CreateCampaignData): Promise<Campaign> {
     scheduledAt: new Date().toISOString()
   })
 
-  const campaign = await httpClient.post<Campaign>('/api/campaigns/immediate', validated)
+  const response = await httpClient.post<Campaign>('/api/campaigns/immediate', validated)
+  const campaign = response.data!
 
   log.info('Campaign scheduled immediately', { campaignId: campaign.id })
   return campaign
@@ -82,7 +84,8 @@ async function scheduleAt(data: CreateCampaignData, scheduledAt: string): Promis
     scheduledAt
   })
 
-  const campaign = await httpClient.post<Campaign>('/api/campaigns/scheduled', validated)
+  const response = await httpClient.post<Campaign>('/api/campaigns/scheduled', validated)
+  const campaign = response.data!
 
   log.info('Campaign scheduled at specific time', { campaignId: campaign.id, scheduledAt })
   return campaign
@@ -97,11 +100,12 @@ async function scheduleRecurring(data: CreateCampaignData, recurrence: Recurrenc
   // Construire RRULE RFC5545
   const rrule = buildRRule(validatedRecurrence)
 
-  const campaign = await httpClient.post<Campaign>('/api/campaigns/recurring', {
+  const response = await httpClient.post<Campaign>('/api/campaigns/recurring', {
     ...validatedData,
     rrule,
     type: 'static_multiple' // Force le type pour récurrence
   })
+  const campaign = response.data!
 
   log.info('Campaign scheduled with recurrence', {
     campaignId: campaign.id,
@@ -114,7 +118,8 @@ async function scheduleRecurring(data: CreateCampaignData, recurrence: Recurrenc
 async function updateSchedule(campaignId: CampaignId, schedule: CampaignSchedule): Promise<Campaign> {
   log.debug('updateSchedule', { campaignId, schedule })
 
-  const campaign = await httpClient.put<Campaign>(`/api/campaigns/${campaignId}/schedule`, schedule)
+  const response = await httpClient.put<Campaign>(`/api/campaigns/${campaignId}/schedule`, schedule)
+  const campaign = response.data!
 
   log.info('Campaign schedule updated', { campaignId })
   return campaign
@@ -198,8 +203,8 @@ export function useCampaignScheduler(params: ScheduledCampaignsParams = {}): Use
   })
 
   const scheduleAtMutation = useMutation({
-    mutationFn: ({ data, scheduledAt }: { data: CreateCampaignData, scheduledAt: string }) =>
-      scheduleAt(data, scheduledAt),
+    mutationFn: ({ data, scheduledAt }: { data: CreateCampaignData; scheduledAt?: string }) =>
+      scheduleAt(data, scheduledAt ?? new Date().toISOString()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: campaignQueryKeys.scheduled() })
       queryClient.invalidateQueries({ queryKey: campaignQueryKeys.events() })
@@ -260,7 +265,7 @@ export function useCampaignScheduler(params: ScheduledCampaignsParams = {}): Use
 
     // Actions
     scheduleImmediate: scheduleImmediateMutation.mutateAsync,
-    scheduleAt: async (data: CreateCampaignData, scheduledAt: string) =>
+    scheduleAt: async (data: CreateCampaignData, scheduledAt?: string) =>
       scheduleAtMutation.mutateAsync({ data, scheduledAt }),
     scheduleRecurring: async (data: CreateCampaignData, recurrence: RecurrenceOptions) =>
       scheduleRecurringMutation.mutateAsync({ data, recurrence }),
@@ -278,25 +283,38 @@ export function useCampaignScheduler(params: ScheduledCampaignsParams = {}): Use
 // ==================== HELPERS ====================
 
 export function getUpcomingEventsForToday(events: ScheduledEvent[]): ScheduledEvent[] {
-  const today = new Date().toISOString().split('T')[0]
-  return events.filter(event => event.scheduledAt.startsWith(today))
+  const [today] = new Date().toISOString().split('T')
+  if (!today) return []
+
+  return events.filter((event) => {
+    const scheduledAt = event.scheduledAt
+    return typeof scheduledAt === 'string' && scheduledAt.startsWith(today)
+  })
 }
 
 export function getUpcomingEventsForWeek(events: ScheduledEvent[]): ScheduledEvent[] {
   const now = new Date()
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
-  return events.filter(event => {
-    const eventDate = new Date(event.scheduledAt)
+  return events.filter((event) => {
+    const scheduledAt = event.scheduledAt
+    if (!scheduledAt) return false
+
+    const eventDate = new Date(scheduledAt)
+    if (Number.isNaN(eventDate.getTime())) return false
+
     return eventDate >= now && eventDate <= weekFromNow
   })
 }
 
 export function groupEventsByDate(events: ScheduledEvent[]): Record<string, ScheduledEvent[]> {
   return events.reduce((groups, event) => {
-    const date = event.scheduledAt.split('T')[0] // YYYY-MM-DD
-    if (!groups[date]) groups[date] = []
-    groups[date].push(event)
+    const date = event.scheduledAt?.split('T')[0]
+    if (!date) return groups
+
+    const groupedEvents = groups[date] ?? []
+    groupedEvents.push(event)
+    groups[date] = groupedEvents
     return groups
   }, {} as Record<string, ScheduledEvent[]>)
 }
@@ -320,10 +338,14 @@ export function findConflictingEvents(events: ScheduledEvent[]): ScheduledEvent[
 
   for (let i = 0; i < events.length; i++) {
     for (let j = i + 1; j < events.length; j++) {
-      if (isEventConflicting(events[i], events[j])) {
-        // Chercher si l'un des événements est déjà dans un groupe de conflit
+      const firstEvent = events[i]
+      const secondEvent = events[j]
+      if (!firstEvent || !secondEvent) continue
+
+      if (isEventConflicting(firstEvent, secondEvent)) {
+        // Chercher si l'un des ?v?nements est d?j?? dans un groupe de conflit
         let conflictGroup = conflicts.find(group =>
-          group.includes(events[i]) || group.includes(events[j])
+          group.includes(firstEvent) || group.includes(secondEvent)
         )
 
         if (!conflictGroup) {
@@ -331,15 +353,14 @@ export function findConflictingEvents(events: ScheduledEvent[]): ScheduledEvent[
           conflicts.push(conflictGroup)
         }
 
-        if (!conflictGroup.includes(events[i])) conflictGroup.push(events[i])
-        if (!conflictGroup.includes(events[j])) conflictGroup.push(events[j])
+        if (!conflictGroup.includes(firstEvent)) conflictGroup.push(firstEvent)
+        if (!conflictGroup.includes(secondEvent)) conflictGroup.push(secondEvent)
       }
     }
   }
 
   return conflicts
 }
-
 export function formatRecurrenceDescription(rrule: string): string {
   if (!rrule) return ''
 
@@ -364,3 +385,8 @@ export function formatRecurrenceDescription(rrule: string): string {
       return 'Récurrent'
   }
 }
+
+
+
+
+

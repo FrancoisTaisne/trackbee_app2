@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod'
-import type { CampaignId, MachineId, FileMeta } from './domain'
+import { logger } from '@/core/utils/logger'
 
 // BLE Device info
 export interface BleDeviceInfo {
@@ -456,7 +456,7 @@ export function safeParseWithLog<T>(
   const result = schema.safeParse(data)
 
   if (!result.success) {
-    console.warn(`[VALIDATION] ${context} failed:`, {
+    logger.warn('validation', `[VALIDATION] ${context} failed`, {
       data,
       errors: result.error.issues,
     })
@@ -498,16 +498,7 @@ export function createAppError(
 
 // ===================== BLE CONNECTION STATE =====================
 
-// État complet de connexion BLE
-export interface BleConnectionState {
-  status: 'disconnected' | 'connecting' | 'connected' | 'error'
-  deviceId?: string
-  deviceName?: string
-  rssi?: number
-  connectedAt?: Date
-  lastError?: string
-  retryCount?: number
-}
+// Duplicate removed - see line 43 for the original BleConnectionState interface
 
 // ===================== TRANSFER PROGRESS =====================
 

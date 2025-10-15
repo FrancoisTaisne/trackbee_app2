@@ -1,66 +1,76 @@
-// @ts-nocheck PUSH FINAL: Skip TypeScript checks for build success
 /**
  * Campaign Detail Component
  * Vue détaillée d'une campagne avec gestion des actions et calculs
  */
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
-  Play, Pause, Square, Edit, Trash2, Copy, Clock, Calendar,
+  Play, Pause, Square, Edit, Trash2, Clock, Calendar,
   Target, Route, Radio, Repeat, FileText, Download, RefreshCw,
-  AlertCircle, CheckCircle, XCircle, Loader, MoreVertical,
-  ChevronDown, ChevronRight, Activity, Plus, Settings
+  CheckCircle, XCircle, Loader, MoreVertical,
+  Activity, Plus, Settings
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { logger } from '@/core/utils/logger'
 import { useCampaign, getCampaignProgress, getCampaignDuration, canStartCampaign, canPauseCampaign, canCancelCampaign, canEditCampaign, canDeleteCampaign } from '../hooks'
 import { CampaignForm } from './CampaignForm'
-// PUSH FINAL: Types temporaires avec any pour déblocage massif
-type CampaignDetailProps = any
-type UpdateCampaignData = any
-type CampaignFile = any
+import type {
+  CampaignDetailProps,
+  UpdateCampaignData,
+  CampaignFile as CampaignFileInfo,
+  CampaignStatistics as CampaignStats,
+  CreateCampaignData
+} from '../types'
+import { CAMPAIGN_TYPES, CAMPAIGN_STATUS_LABELS, CAMPAIGN_PRIORITIES, CAMPAIGN_STATUS_COLORS } from '../types'
+import type { Campaign, CalculationStatus, CalculationId } from '@/core/types/domain'
+import type { CampaignCalculation } from '../types'
 
-import type { Campaign, Calculation } from '@/core/types/domain'
-
-// PUSH FINAL: Constants temporaires avec any
-const CAMPAIGN_TYPES: any = {}
-const CAMPAIGN_STATUS_LABELS: any = {}
-const CAMPAIGN_PRIORITIES: any = {}
-
-// PUSH FINAL: Logger temporaire avec any pour déblocage
-const log = {
-  debug: (msg: string, data?: any) => console.log(msg, data),
-  info: (msg: string, data?: any) => console.log(msg, data),
-  warn: (msg: string, data?: any) => console.warn(msg, data),
-  error: (msg: string, data?: any) => console.error(msg, data),
+// Logger dédié à la fiche campagne
+const campaignLog = {
+  debug: (msg: string, data?: unknown) => logger.debug('campaignDetail', msg, data),
+  info: (msg: string, data?: unknown) => logger.info('campaignDetail', msg, data),
+  warn: (msg: string, data?: unknown) => logger.warn('campaignDetail', msg, data),
+  error: (msg: string, data?: unknown) => logger.error('campaignDetail', msg, data)
 }
 
-const CAMPAIGN_TYPE_ICONS = {
+type UseCampaignResult = ReturnType<typeof useCampaign>
+type CampaignEntity = NonNullable<UseCampaignResult['campaign']>
+type CampaignCalculations = UseCampaignResult['calculations']
+type CampaignFiles = UseCampaignResult['files']
+type CampaignStatsData = UseCampaignResult['statistics']
+type CampaignTab = 'overview' | 'calculations' | 'files' | 'settings'
+
+const CAMPAIGN_TYPE_ICONS: Record<keyof typeof CAMPAIGN_TYPES, LucideIcon> = {
   static_simple: Target,
   static_multiple: Repeat,
   kinematic: Route,
   rover_base: Radio
 }
 
-const STATUS_COLORS = {
-  draft: 'gray',
-  active: 'green',
-  paused: 'yellow',
-  done: 'blue',
-  canceled: 'red'
-}
+const STATUS_COLORS = CAMPAIGN_STATUS_COLORS
 
-const CALCULATION_STATUS_ICONS = {
+const CALCULATION_STATUS_ICONS: Record<CalculationStatus, LucideIcon> = {
   queued: Clock,
   running: Loader,
   done: CheckCircle,
-  failed: XCircle
+  failed: XCircle,
+  pending: Clock,
+  completed: CheckCircle
 }
 
-const CALCULATION_STATUS_COLORS = {
+const CALCULATION_STATUS_COLORS: Record<CalculationStatus, 'yellow' | 'blue' | 'green' | 'red'> = {
   queued: 'yellow',
   running: 'blue',
   done: 'green',
-  failed: 'red'
+  failed: 'red',
+  pending: 'yellow',
+  completed: 'green'
+}
+
+interface CalculationItemProps {
+  calculation: CampaignCalculation
+  compact?: boolean
+  onRetry?: () => void
 }
 
 export function CampaignDetail({
@@ -70,7 +80,7 @@ export function CampaignDetail({
   className = ''
 }: CampaignDetailProps) {
   const [showEditForm, setShowEditForm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'calculations' | 'files' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<CampaignTab>('overview')
   const [showActions, setShowActions] = useState(false)
 
   const {
@@ -93,7 +103,7 @@ export function CampaignDetail({
 
   const handleAction = async (action: string) => {
     try {
-      log.debug('Campaign action', { campaignId, action })
+      campaignLog.debug('Campaign action', { campaignId, action })
 
       switch (action) {
         case 'start':
@@ -122,28 +132,38 @@ export function CampaignDetail({
       }
 
       setShowActions(false)
-      log.info('Campaign action completed', { campaignId, action })
+      campaignLog.info('Campaign action completed', { campaignId, action })
     } catch (error) {
-      log.error('Campaign action failed', { campaignId, action, error })
+      campaignLog.error('Campaign action failed', { campaignId, action, error })
     }
   }
 
-  const handleUpdateCampaign = async (data: UpdateCampaignData) => {
+  const handleEditSubmit = async (formData: CreateCampaignData) => {
     try {
-      const updated = await updateCampaign(data)
+      const updatePayload: UpdateCampaignData = {
+        name: formData.name,
+        description: formData.description,
+        priority: formData.priority,
+        tags: formData.tags,
+        scheduledAt: formData.schedule?.type === 'scheduled' ? formData.schedule.scheduledAt : undefined,
+        rrule: formData.schedule?.type === 'recurring' ? formData.schedule.rrule : undefined
+      }
+
+      const updated = await updateCampaign(updatePayload)
       setShowEditForm(false)
       onUpdate?.(updated)
+      await refetch()
     } catch (error) {
-      log.error('Failed to update campaign', { error })
+      campaignLog.error('Failed to update campaign', { error })
       throw error
     }
   }
 
-  const handleRetryCalculation = async (calculationId: number) => {
+  const handleRetryCalculation = async (calculationId: CalculationId) => {
     try {
       await retryCalculation(calculationId)
     } catch (error) {
-      log.error('Failed to retry calculation', { calculationId, error })
+      campaignLog.error('Failed to retry calculation', { calculationId, error })
     }
   }
 
@@ -172,11 +192,29 @@ export function CampaignDetail({
     )
   }
 
-  const TypeIcon = CAMPAIGN_TYPE_ICONS[campaign.type]
-  const statusColor = STATUS_COLORS[campaign.status]
-  const priorityConfig = CAMPAIGN_PRIORITIES[campaign.priority || 5]
+  const typeKey = campaign.type as keyof typeof CAMPAIGN_TYPES
+  const typeConfig = CAMPAIGN_TYPES[typeKey] ?? CAMPAIGN_TYPES.static_simple
+  const TypeIcon = CAMPAIGN_TYPE_ICONS[typeKey] ?? Target
+
+  const statusKey = campaign.status as keyof typeof STATUS_COLORS
+  const statusColor = STATUS_COLORS[statusKey] ?? 'gray'
+  const statusLabel = CAMPAIGN_STATUS_LABELS[statusKey] ?? campaign.status
+
+  const priorityKey = (campaign.priority ?? 5) as keyof typeof CAMPAIGN_PRIORITIES
+  const priorityConfig = CAMPAIGN_PRIORITIES[priorityKey] ?? { label: 'Normale', color: 'blue' }
+
   const progress = getCampaignProgress(campaign, calculations)
   const duration = getCampaignDuration(campaign)
+  const tabs = useMemo(
+    () =>
+      [
+        { id: 'overview' as const, label: 'Vue d\'ensemble', icon: Target },
+        { id: 'calculations' as const, label: 'Calculs', icon: Activity, count: calculations.length },
+        { id: 'files' as const, label: 'Fichiers', icon: FileText, count: files.length },
+        { id: 'settings' as const, label: 'Paramètres', icon: Settings }
+      ],
+    [calculations.length, files.length]
+  )
 
   return (
     <div className={`campaign-detail ${className}`}>
@@ -184,8 +222,8 @@ export function CampaignDetail({
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-lg bg-${CAMPAIGN_TYPES[campaign.type].color}-100`}>
-              <TypeIcon className={`w-6 h-6 text-${CAMPAIGN_TYPES[campaign.type].color}-600`} />
+            <div className={`p-3 rounded-lg bg-${typeConfig.color}-100`}>
+              <TypeIcon className={`w-6 h-6 text-${typeConfig.color}-600`} />
             </div>
 
             <div>
@@ -193,7 +231,7 @@ export function CampaignDetail({
                 {campaign.name || `Campagne #${campaign.id}`}
               </h1>
               <p className="text-gray-600 mb-3">
-                {campaign.description || CAMPAIGN_TYPES[campaign.type].description}
+                {campaign.description || typeConfig.description}
               </p>
 
               <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -220,7 +258,7 @@ export function CampaignDetail({
           <div className="flex items-center gap-3">
             {/* Statut */}
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-${statusColor}-100 text-${statusColor}-800`}>
-              {CAMPAIGN_STATUS_LABELS[campaign.status]}
+              {statusLabel}
             </span>
 
             {/* Priorité */}
@@ -334,19 +372,14 @@ export function CampaignDetail({
       {/* Navigation des onglets */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex space-x-8">
-          {[
-            { id: 'overview', label: 'Vue d\'ensemble', icon: Target },
-            { id: 'calculations', label: 'Calculs', icon: Activity, count: calculations.length },
-            { id: 'files', label: 'Fichiers', icon: FileText, count: files.length },
-            { id: 'settings', label: 'Paramètres', icon: Settings }
-          ].map((tab) => {
+          {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
 
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm ${
                   isActive
                     ? 'border-blue-500 text-blue-600'
@@ -412,7 +445,7 @@ export function CampaignDetail({
                   tags: campaign.tags
                 }}
                 mode="edit"
-                onSubmit={handleUpdateCampaign as any}
+                onSubmit={handleEditSubmit}
                 onCancel={() => setShowEditForm(false)}
               />
             </div>
@@ -426,7 +459,30 @@ export function CampaignDetail({
 // ==================== TAB COMPONENTS ====================
 
 // Vue d'ensemble
-function OverviewTab({ campaign, statistics, calculations }: any) {
+function OverviewTab({
+  campaign,
+  statistics,
+  calculations
+}: {
+  campaign: CampaignEntity
+  statistics: CampaignStatsData
+  calculations: CampaignCalculations
+}) {
+  const totalCalculations = calculations.length
+  const completedCount = calculations.filter(c => c.status === 'done' || c.status === 'completed').length
+  const failedCount = calculations.filter(c => c.status === 'failed').length
+  const runningCount = calculations.filter(c => c.status === 'running').length
+  const pendingCount = calculations.filter(c => c.status === 'queued' || c.status === 'pending').length
+  const totalFiles = statistics?.totalFiles ?? 0
+  const totalDataSize = statistics?.totalDataSize ?? 0
+  const lastActivityLabel = statistics?.lastActivity
+    ? new Date(statistics.lastActivity).toLocaleString('fr-FR')
+    : new Date(campaign.updatedAt).toLocaleString('fr-FR')
+  const formattedDataSize = totalDataSize > 0 ? (totalDataSize / (1024 * 1024)).toFixed(2) : '0.00'
+  const typeKey = campaign.type as keyof typeof CAMPAIGN_TYPES
+  const typeConfig = CAMPAIGN_TYPES[typeKey] ?? CAMPAIGN_TYPES.static_simple
+  const tags = campaign.tags ?? []
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Statistiques */}
@@ -435,24 +491,24 @@ function OverviewTab({ campaign, statistics, calculations }: any) {
           <h3 className="text-lg font-medium text-gray-900 mb-4">Statistiques</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{calculations.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{totalCalculations}</div>
               <div className="text-sm text-gray-500">Calculs total</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {calculations.filter(c => c.status === 'done').length}
+                {completedCount}
               </div>
               <div className="text-sm text-gray-500">Réussis</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-red-600">
-                {calculations.filter(c => c.status === 'failed').length}
+                {failedCount}
               </div>
               <div className="text-sm text-gray-500">Échoués</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-yellow-600">
-                {calculations.filter(c => ['queued', 'running'].includes(c.status)).length}
+                {runningCount + pendingCount}
               </div>
               <div className="text-sm text-gray-500">En cours</div>
             </div>
@@ -481,7 +537,7 @@ function OverviewTab({ campaign, statistics, calculations }: any) {
           <dl className="space-y-3">
             <div>
               <dt className="text-sm font-medium text-gray-500">Type</dt>
-              <dd className="text-sm text-gray-900">{CAMPAIGN_TYPES[campaign.type].label}</dd>
+              <dd className="text-sm text-gray-900">{typeConfig.label}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500">Durée configurée</dt>
@@ -495,12 +551,12 @@ function OverviewTab({ campaign, statistics, calculations }: any) {
                 <dd className="text-sm text-gray-900">{formatRRule(campaign.rrule)}</dd>
               </div>
             )}
-            {campaign.tags?.length > 0 && (
+            {tags.length > 0 && (
               <div>
                 <dt className="text-sm font-medium text-gray-500">Tags</dt>
                 <dd className="text-sm text-gray-900">
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {campaign.tags.map((tag) => (
+                    {tags.map((tag) => (
                       <span
                         key={tag}
                         className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full"
@@ -512,6 +568,19 @@ function OverviewTab({ campaign, statistics, calculations }: any) {
                 </dd>
               </div>
             )}
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Fichiers suivis</dt>
+              <dd className="text-sm text-gray-900">
+                {totalFiles} fichiers
+                {totalDataSize > 0 && (
+                  <> • {formattedDataSize} Mo</>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Dernière activité</dt>
+              <dd className="text-sm text-gray-900">{lastActivityLabel}</dd>
+            </div>
           </dl>
         </div>
       </div>
@@ -520,7 +589,13 @@ function OverviewTab({ campaign, statistics, calculations }: any) {
 }
 
 // Onglet calculs
-function CalculationsTab({ calculations, onRetryCalculation }) {
+function CalculationsTab({
+  calculations,
+  onRetryCalculation
+}: {
+  calculations: CampaignCalculations
+  onRetryCalculation: (calculationId: CalculationId) => Promise<void> | void
+}) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="p-6 border-b border-gray-200">
@@ -542,7 +617,7 @@ function CalculationsTab({ calculations, onRetryCalculation }) {
 }
 
 // Onglet fichiers
-function FilesTab({ files }) {
+function FilesTab({ files }: { files: CampaignFiles }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg">
       <div className="p-6 border-b border-gray-200">
@@ -574,19 +649,46 @@ function FilesTab({ files }) {
 }
 
 // Onglet paramètres
-function SettingsTab({ campaign }) {
+function SettingsTab({ campaign }: { campaign: CampaignEntity }) {
+  const scheduleInfo = campaign.scheduledAt
+    ? new Date(campaign.scheduledAt).toLocaleString('fr-FR')
+    : 'Exécution immédiate'
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Paramètres</h3>
-      <p className="text-gray-500">Configuration avancée à venir...</p>
+      <dl className="space-y-3 text-sm text-gray-600">
+        <div>
+          <dt className="font-medium text-gray-500">Site</dt>
+          <dd className="text-gray-900">#{campaign.siteId}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-gray-500">Machine</dt>
+          <dd className="text-gray-900">#{campaign.machineId}</dd>
+        </div>
+        {campaign.installationId && (
+          <div>
+            <dt className="font-medium text-gray-500">Installation</dt>
+            <dd className="text-gray-900">#{campaign.installationId}</dd>
+          </div>
+        )}
+        <div>
+          <dt className="font-medium text-gray-500">Planification</dt>
+          <dd className="text-gray-900">{scheduleInfo}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-gray-500">Priorité</dt>
+          <dd className="text-gray-900">{campaign.priority ?? 5}</dd>
+        </div>
+      </dl>
     </div>
   )
 }
 
 // ==================== CALCULATION ITEM COMPONENT ====================
 
-function CalculationItem({ calculation, compact = false, onRetry }) {
-  const StatusIcon = CALCULATION_STATUS_ICONS[calculation.status]
+function CalculationItem({ calculation, compact = false, onRetry }: CalculationItemProps) {
+  const StatusIcon = CALCULATION_STATUS_ICONS[calculation.status] ?? Clock
   const statusColor = CALCULATION_STATUS_COLORS[calculation.status]
 
   return (
@@ -642,3 +744,4 @@ function formatRRule(rrule: string): string {
       return 'Récurrent'
   }
 }
+
