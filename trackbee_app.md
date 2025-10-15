@@ -594,6 +594,7 @@ VITE_DEBUG_PERFORMANCE=true → Metrics temps réel
 - ✅ **Authentication**: Login/logout flow operational
 - ✅ **Navigation**: Routes + guards functional
 - ✅ **BLE**: Discovery + connection tested
+- 🧪 **Orchestration**: `npm run test:orchestration` (hydration, BLE, géocodage)
 - ⏳ **E2E**: Full workflow testing (Playwright future)
 
 ### Test Framework Setup
