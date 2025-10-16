@@ -102,7 +102,7 @@ function createAppConfig(): AppConfig {
   const isProduction = mode === 'production'
 
   // URLs API
-  const localUrl = parseString(import.meta.env.VITE_SERVER_ADDRESS_LOCAL, 'http://localhost:3313')
+  const localUrl = parseString(import.meta.env.VITE_SERVER_ADDRESS_LOCAL, 'http://localhost:3317')
   const webUrl = parseString(import.meta.env.VITE_SERVER_ADDRESS_WEB, 'https://api.trackbee.com')
   const useLocal = parseBoolean(import.meta.env.VITE_LOCAL, isDev)
   const currentUrl = useLocal ? localUrl : webUrl
