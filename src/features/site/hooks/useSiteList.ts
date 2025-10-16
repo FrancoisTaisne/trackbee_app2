@@ -75,14 +75,14 @@ const sortSites = (bundles: SiteBundle[], sorting: SiteSorting): SiteBundle[] =>
         break
       case 'createdAt':
         result = compareNumbers(
-          a.site.createdAt ? new Date(a.site.createdAt).getTime() : 0,
-          b.site.createdAt ? new Date(b.site.createdAt).getTime() : 0
+          a.site.createdAt ? (a.site.createdAt instanceof Date ? a.site.createdAt.getTime() : new Date(a.site.createdAt).getTime()) : 0,
+          b.site.createdAt ? (b.site.createdAt instanceof Date ? b.site.createdAt.getTime() : new Date(b.site.createdAt).getTime()) : 0
         )
         break
       case 'updatedAt':
         result = compareNumbers(
-          a.site.updatedAt ? new Date(a.site.updatedAt).getTime() : 0,
-          b.site.updatedAt ? new Date(b.site.updatedAt).getTime() : 0
+          a.site.updatedAt ? (a.site.updatedAt instanceof Date ? a.site.updatedAt.getTime() : new Date(a.site.updatedAt).getTime()) : 0,
+          b.site.updatedAt ? (b.site.updatedAt instanceof Date ? b.site.updatedAt.getTime() : new Date(b.site.updatedAt).getTime()) : 0
         )
         break
       case 'installationCount':
@@ -132,17 +132,84 @@ const fetchSiteBundles = async (
   filters: SiteFilters,
   sorting: SiteSorting
 ): Promise<SiteBundle[]> => {
-  siteListLog.debug('Fetching sites', { filters, sorting })
+  siteListLog.debug('Fetching sites from IndexedDB', { filters, sorting })
 
   try {
-    const response = await httpClient.get<Site[]>('/api/sites')
-    const sites = response.data ?? []
+    // 🎯 LECTURE DEPUIS INDEXEDDB (données hydratées lors du login)
+    const { database } = await import('@/core/database/schema')
+    const { getInstallationRepository } = await import('@/core/repositories/InstallationRepository')
 
-    const bundles = sites.map(toSiteBundle)
+    const installationRepo = getInstallationRepository(database)
+
+    // Récupérer tous les sites depuis IndexedDB
+    const dbSites = await database.sites.toArray()
+
+    siteListLog.debug('Sites loaded from IndexedDB', { count: dbSites.length })
+
+    // Enrichir avec les installations et créer les bundles
+    const bundles = await Promise.all(
+      dbSites.map(async (dbSite): Promise<SiteBundle> => {
+        const installations = await installationRepo.findBySiteId(dbSite.id)
+
+        // Récupérer les campagnes pour ce site
+        const campaigns = await database.campaigns
+          .where('siteId')
+          .equals(dbSite.id)
+          .toArray()
+
+        const activeCampaigns = campaigns.filter(c => c.status === 'active')
+
+        return {
+          site: dbSite,
+          installations,
+          machines: [],
+          campaigns,
+          calculations: [],
+          statistics: {
+            totalInstallations: installations.length,
+            activeInstallations: installations.filter(i => i.isActive).length,
+            totalMachines: 0,
+            connectedMachines: 0,
+            totalCampaigns: campaigns.length,
+            activeCampaigns: activeCampaigns.length,
+            completedCalculations: 0,
+            failedCalculations: 0,
+            lastActivity: dbSite.lastActivity
+          }
+        }
+      })
+    )
+
     const filtered = applyFilters(bundles, filters)
-    return sortSites(filtered, sorting)
+    const sorted = sortSites(filtered, sorting)
+
+    // 🔍 DEBUG: Log first site structure
+    if (sorted.length > 0) {
+      const firstSite = sorted[0]
+      siteListLog.debug('🔍 First site structure:', {
+        'site.id': firstSite.site.id,
+        'site.id type': typeof firstSite.site.id,
+        'site.name': firstSite.site.name,
+        'site.lat': firstSite.site.lat,
+        'site.lng': firstSite.site.lng,
+        'site object keys': Object.keys(firstSite.site)
+      })
+    }
+
+    siteListLog.info('✅ Sites loaded from IndexedDB (hydrated cache)', {
+      total: dbSites.length,
+      filtered: filtered.length,
+      sorted: sorted.length
+    })
+
+    return sorted
+
   } catch (error) {
-    siteListLog.error('Failed to fetch sites', { error })
+    siteListLog.error('❌ Failed to load sites from IndexedDB', { error })
+
+    // Retourner un tableau vide en cas d'erreur
+    // L'hydratation devrait remplir IndexedDB lors du prochain login
+    siteListLog.warn('⚠️ Returning empty array - user should re-login to trigger hydration')
     return []
   }
 }

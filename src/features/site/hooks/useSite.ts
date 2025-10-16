@@ -51,53 +51,74 @@ export const siteQueryKeys = {
 // ==================== API FUNCTIONS ====================
 
 /**
- * Récupère un site par ID
+ * Récupère un site par ID depuis IndexedDB
  */
 const fetchSite = async (id: SiteId): Promise<Site> => {
-  siteLog.debug('Fetching site', { id })
-  const response = await httpClient.get<Site>(`/api/sites/${id}`)
-  const site = response.data!
-  siteLog.debug('Site fetched', { site })
-  return site
+  siteLog.debug('Fetching site from IndexedDB', { id })
+
+  try {
+    const { DataService } = await import('@/core/services/data/DataService')
+    const site = await DataService.getSiteById(id)
+
+    if (!site) {
+      throw new AppError(`Site not found: ${id}`, 'SITE_NOT_FOUND')
+    }
+
+    siteLog.debug('Site fetched from IndexedDB', { site })
+    return site as Site
+  } catch (error) {
+    siteLog.error('Failed to fetch site from IndexedDB', { id, error })
+    throw error
+  }
 }
 
 /**
- * Récupère un bundle complet (site + relations)
+ * Récupère un bundle complet (site + relations) depuis IndexedDB
  */
 const fetchSiteBundle = async (id: SiteId): Promise<SiteBundle> => {
-  siteLog.debug('Fetching site bundle', { id })
+  siteLog.debug('Fetching site bundle from IndexedDB', { id })
 
-  const [site, installationsResp, campaignsResp, calculationsResp] = await Promise.all([
-    fetchSite(id),
-    httpClient.get<Installation[]>(`/api/sites/${id}/installations`),
-    httpClient.get<Campaign[]>(`/api/sites/${id}/campaigns`),
-    httpClient.get<Calculation[]>(`/api/sites/${id}/calculations`)
-  ])
+  try {
+    const { DataService } = await import('@/core/services/data/DataService')
+    const { database } = await import('@/core/database/schema')
 
-  const installations = installationsResp.data!
-  const campaigns = campaignsResp.data!
-  const calculations = calculationsResp.data!
+    // Récupérer le site
+    const site = await fetchSite(id)
 
-  // Récupérer les machines associées aux installations
-  const machineIds = installations.map(i => i.machineId)
-  const machines: Machine[] = []
+    // Récupérer les installations pour ce site
+    const installations = await DataService.getInstallationsBySite(id)
 
-  if (machineIds.length > 0) {
-    const machinePromises = machineIds.map(machineId =>
-      httpClient.get<Machine>(`/api/machines/${machineId}`)
-    )
-    const machineResponses = await Promise.all(machinePromises)
-    machines.push(...machineResponses.map(resp => resp.data!))
-  }
+    // Récupérer les campagnes pour ce site
+    const campaigns = await database.campaigns
+      .where('siteId')
+      .equals(Number(id))
+      .toArray()
 
-  // Calculer les statistiques
-  const statistics: SiteStatistics = {
-    totalInstallations: installations.length,
-    activeInstallations: installations.filter(i => machines.find(m => m.id === i.machineId)?.isActive).length,
-    totalMachines: machines.length,
-    connectedMachines: 0, // TODO: Récupérer depuis BLE store
-    totalCampaigns: campaigns.length,
-    activeCampaigns: campaigns.filter(c => c.status === 'active').length,
+    // Récupérer les calculs pour ce site
+    const calculations = await database.calculations
+      .where('siteId')
+      .equals(Number(id))
+      .toArray()
+
+    // Récupérer les machines associées aux installations
+    const machines: Machine[] = []
+    const machineIds = [...new Set(installations.map(i => i.machineId))]
+
+    for (const machineId of machineIds) {
+      const machine = await DataService.getMachineById(machineId)
+      if (machine) {
+        machines.push(machine as Machine)
+      }
+    }
+
+    // Calculer les statistiques
+    const statistics: SiteStatistics = {
+      totalInstallations: installations.length,
+      activeInstallations: installations.filter(i => i.isActive).length,
+      totalMachines: machines.length,
+      connectedMachines: 0, // TODO: Récupérer depuis BLE store
+      totalCampaigns: campaigns.length,
+      activeCampaigns: campaigns.filter(c => c.status === 'active').length,
     completedCalculations: calculations.filter(c => c.status === 'done').length,
     failedCalculations: calculations.filter(c => c.status === 'failed').length,
     lastActivity: installations.length > 0
@@ -105,17 +126,22 @@ const fetchSiteBundle = async (id: SiteId): Promise<SiteBundle> => {
       : undefined
   }
 
-  const bundle: SiteBundle = {
-    site,
-    installations,
-    machines,
-    campaigns,
-    calculations,
-    statistics
-  }
+    const bundle: SiteBundle = {
+      site,
+      installations,
+      machines,
+      campaigns,
+      calculations,
+      statistics
+    }
 
-  siteLog.debug('Site bundle fetched', { bundle })
-  return bundle
+    siteLog.debug('Site bundle fetched from IndexedDB', { bundle })
+    return bundle
+
+  } catch (error) {
+    siteLog.error('Failed to fetch site bundle from IndexedDB', { id, error })
+    throw error
+  }
 }
 
 /**

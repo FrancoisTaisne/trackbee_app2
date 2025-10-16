@@ -35,6 +35,120 @@ src/
 └── main.tsx                 # Bootstrap Vite/React
 ```
 
+### 📂 Organisation Détaillée des Dossiers
+
+#### **`src/core/` - Couche Infrastructure (Framework-agnostic)**
+Contient toute la logique métier et technique indépendante de React.
+
+| Dossier | Rôle | Fichiers clés |
+|---------|------|---------------|
+| **`database/`** | Gestion IndexedDB avec Dexie | `schema.ts` - Définition tables<br>`repositories/` - Couche d'accès données |
+| **`orchestrator/`** | Coordination événements système | `EventBus.ts` - Bus événements global<br>`TransferOrchestrator.ts` - Gestion transferts fichiers |
+| **`services/`** | Services techniques | `ble/BleManager.ts` - Communication Bluetooth<br>`api/HttpClient.ts` - Client HTTP REST<br>`storage/StorageManager.ts` - Persistence données<br>`hydration/HydrationService.ts` - Chargement données bulk |
+| **`state/`** | Gestion état application | `stores/` - Zustand stores (auth, device, ble)<br>`providers/` - React Query + providers globaux |
+| **`types/`** | Types TypeScript partagés | `domain.ts` - Entités métier (Site, Machine, Campaign)<br>`api.ts` - Types réponses API<br>`ble.ts` - Types protocole BLE |
+| **`utils/`** | Utilitaires | `logger.ts` - Système logging structuré<br>`format.ts` - Formatage données<br>`time.ts` - Manipulation dates<br>`ids.ts` - Génération IDs uniques |
+
+#### **`src/features/` - Modules Métier (Feature-based)**
+Chaque dossier = une fonctionnalité complète isolée.
+
+| Feature | Description | Contenu typique |
+|---------|-------------|-----------------|
+| **`auth/`** | Authentification utilisateur | `pages/LoginPage.tsx`<br>`hooks/useAuth.ts`<br>`components/LoginModal.tsx`<br>`types/index.ts` |
+| **`device/`** | Gestion devices IoT | `pages/DeviceListPage.tsx`, `DeviceDetailPage.tsx`<br>`hooks/useDeviceList.ts`, `useDeviceScan.ts`<br>`components/DeviceCard.tsx`, `BleStatusPill.tsx`<br>`types/` - DeviceBundle, BLEStatus |
+| **`site/`** | Gestion sites géographiques | `pages/SiteListPage.tsx`, `SiteDetailPage.tsx`<br>`hooks/useSiteList.ts`, `useSiteMap.ts`<br>`components/SiteForm.tsx`, `SiteMapView.tsx`<br>`types/` - SiteBundle, SiteFilters |
+| **`campaign/`** | Campagnes de mesure GNSS | `pages/CampaignListPage.tsx`<br>`hooks/useCampaignList.ts`<br>`components/CampaignForm.tsx`<br>`types/` - CampaignType, CampaignStatus |
+| **`transfer/`** | Transferts fichiers BLE/WiFi | `pages/TransferQueuePage.tsx`<br>`hooks/useTransfer.ts`<br>`components/TransferProgress.tsx`<br>`types/` - TransferTask, TransferStatus |
+| **`processing/`** | Post-traitement RTKLIB | `pages/ProcessingListPage.tsx`<br>`hooks/useProcessing.ts`<br>`components/ProcessingResults.tsx`<br>`types/` - Calculation, ProcessingResult |
+| **`dashboard/`** | Tableau de bord principal | `pages/DashboardPage.tsx`<br>`components/StatsCard.tsx`, `QuickActions.tsx` |
+| **`settings/`** | Configuration application | `pages/SettingsPage.tsx`<br>`components/SettingsForm.tsx` |
+| **`profile/`** | Profil utilisateur | `pages/ProfilePage.tsx`<br>`components/UserAvatar.tsx` |
+
+**Structure type d'une feature** :
+```
+features/device/
+├── pages/              # Pages React Router
+│   ├── DeviceListPage.tsx
+│   └── DeviceDetailPage.tsx
+├── components/         # Composants UI spécifiques
+│   ├── DeviceCard.tsx
+│   ├── BleStatusPill.tsx
+│   └── FileDownloadButton.tsx
+├── hooks/             # Hooks métier
+│   ├── useDeviceList.ts
+│   ├── useDeviceScan.ts
+│   └── useDeviceConnection.ts
+└── types/             # Types TypeScript
+    └── index.ts
+```
+
+#### **`src/shared/` - Composants Réutilisables UI**
+Code partagé entre toutes les features, sans logique métier.
+
+| Dossier | Rôle | Contenu |
+|---------|------|---------|
+| **`ui/components/`** | Design system | `Button/` - 7 variantes<br>`Card/` - Card, CardHeader, CardTitle, CardContent<br>`Modal/` - Modale réutilisable<br>`Input/`, `Badge/`, `Tabs/`, `Progress/` |
+| **`ui/layout/`** | Layout application | `AppLayout.tsx` - Layout principal avec header/sidebar<br>`Header.tsx` - Barre navigation<br>`Sidebar.tsx` - Menu latéral desktop<br>`MobileNav.tsx` - Navigation mobile bottom tabs |
+| **`ui/theme/`** | Thème et styles | `ThemeProvider.tsx` - Context dark/light mode<br>`colors.ts` - Palette couleurs TrackBee<br>`typography.ts` - Échelle typographique |
+| **`ui/pages/`** | Pages génériques | `NotFoundPage.tsx` - 404<br>`ErrorPage.tsx` - Erreurs globales |
+| **`utils/`** | Helpers UI | `cn.ts` - Merge classes CSS conditionnelles<br>`responsive.ts` - Breakpoints helpers |
+
+#### **Fichiers Racine `src/`**
+
+| Fichier | Rôle |
+|---------|------|
+| **`main.tsx`** | Point d'entrée Vite/React - Monte `<App />` dans le DOM |
+| **`App.tsx`** | Composant racine - Setup providers (Query, Auth, Theme, ErrorBoundary) |
+| **`AppRouter.tsx`** | Configuration routes + guards authentification + lazy loading pages |
+| **`AppInitializer.ts`** | Bootstrap services au démarrage (IndexedDB, BleManager, Logger) |
+
+#### **Autres Dossiers Projet**
+
+| Dossier | Rôle |
+|---------|------|
+| **`public/`** | Assets statiques | `favicon.ico`, images, fichiers HTML de test |
+| **`capacitor/`** | Configuration mobile | `android/` - Projet Android Studio<br>`ios/` - Projet Xcode (si macOS) |
+| **`scriptClaude/`** | Scripts de test | Scripts Node.js pour tester API, BLE, workflows |
+| **`dist/`** | Build production | Généré par `npm run build` - Assets optimisés |
+
+### 🎯 Principes d'Organisation
+
+#### **Séparation des Responsabilités**
+- **`core/`** = Logique pure, testable, réutilisable
+- **`features/`** = Fonctionnalités métier isolées
+- **`shared/`** = UI réutilisable, pas de logique métier
+
+#### **Feature-Based Architecture**
+Chaque feature est **autonome** et contient tout ce dont elle a besoin (pages, hooks, components, types). Permet :
+- ✅ Développement parallèle d'équipes
+- ✅ Réutilisation facile (copy/paste feature entière)
+- ✅ Tests isolés par feature
+- ✅ Suppression simple d'une feature obsolète
+
+#### **Colocation de Fichiers**
+Les fichiers liés sont **proches physiquement** :
+```
+device/
+├── DeviceListPage.tsx        # Utilise ↓
+├── hooks/useDeviceList.ts    # Utilise ↓
+└── types/index.ts            # Types partagés
+```
+
+#### **Import Path Aliases**
+Configuration TypeScript pour imports propres :
+```typescript
+// ❌ Avant
+import { useAuth } from '../../../core/state/stores/auth.store'
+
+// ✅ Après
+import { useAuth } from '@/core/state/stores/auth.store'
+
+// Autres alias
+@/core/*       → src/core/*
+@/features/*   → src/features/*
+@/shared/*     → src/shared/*
+```
+
 ### Philosophie Event-Driven
 ```typescript
 // Architecture centralisée autour d'EventBus

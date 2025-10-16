@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 // UI Components imports
-import { AppLayout, PageHeader, Section, Breadcrumb } from '@/shared/ui/components/Layout'
+import { PageHeader, Section } from '@/shared/ui/components/Layout'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/components/Card/Card'
 import { Button } from '@/shared/ui/components/Button/Button'
 import { Input } from '@/shared/ui/components/Input/Input'
@@ -89,9 +89,9 @@ const SiteCard: React.FC<SiteCardProps> = ({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <CardTitle className="flex items-center space-x-2">
-              <h3 className="text-lg font-semibold text-gray-900 truncate">
+              <span className="text-lg font-semibold text-gray-900 truncate">
                 {siteData.name}
-              </h3>
+              </span>
               <div className="flex items-center space-x-1">
                 {siteData.isPublic ? (
                   <Globe className="w-4 h-4 text-success-500" />
@@ -383,7 +383,7 @@ export const SiteListPage: React.FC = () => {
 
   if (showCreateForm) {
     return (
-      <AppLayout title="Nouveau site">
+      <>
         <PageHeader
           title="CrÃ©er un nouveau site"
           description="DÃ©finissez un site gÃ©ographique pour y installer vos devices TrackBee"
@@ -399,12 +399,12 @@ export const SiteListPage: React.FC = () => {
             onCancel={() => setShowCreateForm(false)}
           />
         </Section>
-      </AppLayout>
+      </>
     )
   }
 
   return (
-    <AppLayout title="Sites">
+    <>
       <PageHeader
         title="Sites gÃ©ographiques"
         description="GÃ©rez vos sites de mesure et leurs installations"
@@ -658,13 +658,17 @@ export const SiteListPage: React.FC = () => {
         confirmText="Supprimer"
         variant="danger"
       />
-    </AppLayout>
+    </>
   )
 }
 
 // ==================== DISPLAY NAME ====================
 
 SiteListPage.displayName = 'SiteListPage'
+
+// ==================== EXPORT ====================
+
+export default SiteListPage
 
 
 

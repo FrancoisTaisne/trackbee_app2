@@ -26,7 +26,7 @@ const DevicesListPage = React.lazy(() => import('@/features/device/pages/Devices
 const DeviceDetailPage = React.lazy(() => import('@/features/device/pages/DeviceDetailPage'))
 
 // Pages protégées - Sites
-const SitesListPage = React.lazy(() => import('@/features/site/pages/SitesListPage'))
+const SiteListPage = React.lazy(() => import('@/features/site/pages/SiteListPage'))
 const SiteDetailPage = React.lazy(() => import('@/features/site/pages/SiteDetailPage'))
 
 // Pages protégées - Campaigns
@@ -129,7 +129,7 @@ const protectedRoutes = [
   // Routes Sites
   {
     path: 'sites',
-    element: <SitesListPage />
+    element: <SiteListPage />
   },
   {
     path: 'sites/:siteId',

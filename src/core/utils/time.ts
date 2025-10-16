@@ -1,7 +1,27 @@
 // Time utilities
-export function formatDistanceToNow(date: Date | string): string {
+export function formatDistanceToNow(date: Date | string | undefined | null): string {
+  // 🔒 Sécurité: Gérer les cas invalides
+  if (!date) return "jamais"
+
   const now = new Date()
-  const target = typeof date === "string" ? new Date(date) : date
+  let target: Date
+
+  if (typeof date === "string") {
+    target = new Date(date)
+  } else if (date instanceof Date) {
+    target = date
+  } else {
+    // Si c'est un objet qui n'est ni string ni Date, retourner un message sûr
+    console.warn('[time.ts] formatDistanceToNow received invalid date:', date)
+    return "date invalide"
+  }
+
+  // Vérifier que la date est valide
+  if (isNaN(target.getTime())) {
+    console.warn('[time.ts] formatDistanceToNow received invalid date:', date)
+    return "date invalide"
+  }
+
   const diff = now.getTime() - target.getTime()
   const seconds = Math.floor(diff / 1000)
   const minutes = Math.floor(seconds / 60)

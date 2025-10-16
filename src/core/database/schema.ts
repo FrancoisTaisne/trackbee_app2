@@ -205,7 +205,9 @@ export class TrackBeeDatabase extends Dexie {
   constructor() {
     super('TrackBeeDB')
 
-    this.version(1).stores({
+    // Version 1: Schema initial
+    // Version 2: Added siteId and machineId indexes to campaigns table
+    this.version(2).stores({
       // Tables principales avec index optimisés
       users: '&id, email, syncedAt',
 
@@ -215,7 +217,7 @@ export class TrackBeeDatabase extends Dexie {
 
       installations: '&id, machineId, siteId, userId, syncedAt, isActive, lastActivity',
 
-      campaigns: '&id, installationId, type, status, syncedAt, isMonitoring, priority, lastFileAt',
+      campaigns: '&id, installationId, siteId, machineId, type, status, syncedAt, isMonitoring, priority, lastFileAt',
 
       calculations: '&id, campaignId, status, syncedAt, retryCount',
 

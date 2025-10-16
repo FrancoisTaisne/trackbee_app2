@@ -220,6 +220,25 @@ export class DataService {
   }
 
   /**
+   * Récupérer une campagne par ID
+   */
+  static async getCampaignById(id: string | number): Promise<DatabaseCampaign | null> {
+    try {
+      const numericId = typeof id === 'string' ? Number(id) : id
+      if (!Number.isFinite(numericId)) {
+        stateLog.warn('⚠️ Invalid campaign ID provided', { id })
+        return null
+      }
+
+      const campaign = await database.campaigns.get(numericId)
+      return campaign || null
+    } catch (error) {
+      stateLog.error('❌ Failed to get campaign by ID', { id, error })
+      return null
+    }
+  }
+
+  /**
    * Récupérer les campagnes par statut
    */
   static async getCampaignsByStatus(status: string): Promise<DatabaseCampaign[]> {
@@ -233,6 +252,44 @@ export class DataService {
       return campaigns
     } catch (error) {
       stateLog.error('❌ Failed to get campaigns by status', { status, error })
+      return []
+    }
+  }
+
+  /**
+   * Récupérer les campagnes par site
+   */
+  static async getCampaignsBySite(siteId: string | number): Promise<DatabaseCampaign[]> {
+    try {
+      const numericId = typeof siteId === 'string' ? Number(siteId) : siteId
+      const campaigns = await database.campaigns
+        .where('siteId')
+        .equals(numericId)
+        .toArray()
+
+      stateLog.debug('📊 Campaigns by site retrieved', { siteId, count: campaigns.length })
+      return campaigns
+    } catch (error) {
+      stateLog.error('❌ Failed to get campaigns by site', { siteId, error })
+      return []
+    }
+  }
+
+  /**
+   * Récupérer les campagnes par machine
+   */
+  static async getCampaignsByMachine(machineId: string | number): Promise<DatabaseCampaign[]> {
+    try {
+      const numericId = typeof machineId === 'string' ? Number(machineId) : machineId
+      const campaigns = await database.campaigns
+        .where('machineId')
+        .equals(numericId)
+        .toArray()
+
+      stateLog.debug('📊 Campaigns by machine retrieved', { machineId, count: campaigns.length })
+      return campaigns
+    } catch (error) {
+      stateLog.error('❌ Failed to get campaigns by machine', { machineId, error })
       return []
     }
   }
