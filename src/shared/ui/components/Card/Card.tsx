@@ -20,7 +20,7 @@ const cardVariants = cva(
       variant: {
         // Carte par défaut - minimaliste
         default: [
-          'bg-white border-gray-200',
+          'bg-grey border-gray-200',
           'hover:border-gray-300',
           'dark:bg-gray-900 dark:border-gray-800',
           'dark:hover:border-gray-700'

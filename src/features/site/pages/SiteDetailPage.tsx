@@ -21,7 +21,6 @@ import {
   Wifi
 } from 'lucide-react'
 import {
-  AppLayout,
   PageHeader,
   Section,
   Card,
@@ -42,8 +41,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-  Breadcrumb
+  SelectValue
 } from '@/shared/ui/components'
 import {
   SiteMapView,
@@ -102,7 +100,7 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Informations gÃ©nÃ©rales</CardTitle>
+              <CardTitle>Informations générales</CardTitle>
               <div className="flex space-x-2">
                 <Button
                   variant="outline"
@@ -143,11 +141,11 @@ const SiteInfoTab: React.FC<SiteInfoTabProps> = ({ site, onEdit, onExport }) => 
                   ) : (
                     <>
                       <Lock className="w-4 h-4 text-gray-400" />
-                      <Badge variant="secondary">PrivÃ©</Badge>
+                      <Badge variant="secondary">Privé</Badge>
                     </>
                   )}
                   {siteData.ownership === 'shared' && (
-                    <Badge variant="primary">PartagÃ©</Badge>
+                    <Badge variant="primary">Partagés</Badge>
                   )}
                 </div>
               </div>
@@ -407,7 +405,7 @@ const InstallationsTab: React.FC<InstallationsTabProps> = ({
             onClick={onCreateInstallation}
             leftIcon={<Plus className="w-4 h-4" />}
           >
-            PremiÃ¨re installation
+            Première installation
           </Button>
         </div>
       ) : (
@@ -502,7 +500,7 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Calendar className="w-5 h-5" />
-              <span>Campagnes rÃ©centes</span>
+              <span>Campagnes récentes</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -613,9 +611,25 @@ const StatisticsTab: React.FC<StatisticsTabProps> = ({ site }) => {
 // ==================== MAIN COMPONENT ====================
 
 export const SiteDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
+  const { siteId: siteIdParam } = useParams<{ siteId: string }>()
   const navigate = useNavigate()
-  const siteId = parseInt(id || '0', 10)
+
+  siteDetailLog.debug('🎯 SiteDetailPage rendered with route params', {
+    siteIdParam,
+    typeOfId: typeof siteIdParam,
+    idIsUndefined: siteIdParam === undefined,
+    idIsNull: siteIdParam === null,
+    rawId: siteIdParam
+  })
+
+  const siteId = siteIdParam ? parseInt(siteIdParam, 10) : 0
+
+  siteDetailLog.debug('🔢 Parsed siteId', {
+    siteId,
+    originalId: siteIdParam,
+    isNaN: Number.isNaN(siteId),
+    isFinite: Number.isFinite(siteId)
+  })
 
   const [activeTab, setActiveTab] = useState('info')
   const [showEditForm, setShowEditForm] = useState(false)
@@ -700,22 +714,19 @@ export const SiteDetailPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <AppLayout title="Chargement...">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="space-y-4">
-            <div className="h-32 bg-gray-200 rounded"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-          </div>
+      <div className="animate-pulse space-y-6">
+        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+        <div className="space-y-4">
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
-      </AppLayout>
+      </div>
     )
   }
 
   if (error || !site) {
     return (
-      <AppLayout title="Erreur">
-        <div className="text-center py-12">
+      <div className="text-center py-12">
           <div className="text-danger-600 mb-4">
             <MapPin className="w-12 h-12 mx-auto" />
           </div>
@@ -735,7 +746,6 @@ export const SiteDetailPage: React.FC = () => {
             </Button>
           </div>
         </div>
-      </AppLayout>
     )
   }
 
@@ -743,7 +753,7 @@ export const SiteDetailPage: React.FC = () => {
 
   if (showEditForm) {
     return (
-      <AppLayout title={`Modifier ${site.site.name}`}>
+      <>
         <PageHeader
           title={`Modifier le site "${site.site.name}"`}
           breadcrumbs={[
@@ -760,14 +770,14 @@ export const SiteDetailPage: React.FC = () => {
             onCancel={() => setShowEditForm(false)}
           />
         </Section>
-      </AppLayout>
+      </>
     )
   }
 
   // ==================== MAIN RENDER ====================
 
   return (
-    <AppLayout title={site.site.name}>
+    <>
       <PageHeader
         title={site.site.name}
         description={
@@ -834,7 +844,7 @@ export const SiteDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </Section>
-    </AppLayout>
+    </>
   )
 }
 

@@ -82,7 +82,12 @@
       "Bash(then sed -i '1i// @ts-nocheck\\n' \"$file\")",
       "Bash(fi)",
       "Bash(cut:*)",
-      "Bash(do sed -i \"s/const log = logger$/const log = logger.extend(''''campaign'''')/\" \"$file\")"
+      "Bash(do sed -i \"s/const log = logger$/const log = logger.extend(''''campaign'''')/\" \"$file\")",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: ajout gestion base profiles et configurations\n\n- Ajout modèles basePositionHistory, installationBaseChannel, installationBaseChannelConfig, installationBaseProfile\n- Ajout contrôleur baseProfile pour gestion des profils de base\n- Ajout route baseProfile.route.js\n- Ajout service baseChannel pour gestion des canaux de base\n- Modifications sur installation.controller.js et postProcessing.controller.js\n- Modifications sur installaton.model.js et index.model.js\n- Scripts de test pour endpoints et intégration frontend\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git reset:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: ajout gestion base profiles et configurations\n\n- Ajout modèles basePositionHistory, installationBaseChannel, installationBaseChannelConfig, installationBaseProfile\n- Ajout contrôleur baseProfile pour gestion des profils de base\n- Ajout route baseProfile.route.js\n- Ajout service baseChannel pour gestion des canaux de base\n- Modifications sur installation.controller.js et postProcessing.controller.js\n- Modifications sur installaton.model.js et index.model.js\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImlzTWFjaGluZSI6ZmFsc2UsImlhdCI6MTc2MDcwMzMxMCwiZXhwIjoxNzcwNzAzMjk2fQ.3sOc2FwiYiS5C-i6iIJVi8qTw7DE_JiehiHRTORmD4c\")"
     ],
     "deny": [],
     "ask": []

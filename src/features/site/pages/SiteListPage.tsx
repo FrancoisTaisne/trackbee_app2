@@ -1,6 +1,6 @@
-﻿/**
+/**
  * SiteListPage Component - Page de liste des sites
- * Interface principale pour visualiser, gÃ©rer et crÃ©er des sites gÃ©ographiques
+ * Interface principale pour visualiser, gérer et créer des sites géographiques
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
@@ -26,7 +26,6 @@ import { PageHeader, Section } from '@/shared/ui/components/Layout'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/components/Card/Card'
 import { Button } from '@/shared/ui/components/Button/Button'
 import { Input } from '@/shared/ui/components/Input/Input'
-import { Badge } from '@/shared/ui/components/Badge/Badge'
 import { ConfirmationModal } from '@/shared/ui/components/Modal/Modal'
 import {
   Tabs,
@@ -60,7 +59,7 @@ const siteListLog = {
   error: (msg: string, data?: unknown) => logger.error('siteListPage', msg, data)
 }
 
-// ==================== SITE CARD COMPONENT ====================
+// ==================== SITE CARD COMPONENT (COMPACT) ====================
 
 interface SiteCardProps {
   site: SiteBundle
@@ -85,60 +84,53 @@ const SiteCard: React.FC<SiteCardProps> = ({
       className="transition-all duration-200 hover:shadow-md cursor-pointer group"
       onClick={() => onSelect(site)}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-1">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <CardTitle className="flex items-center space-x-2">
-              <span className="text-lg font-semibold text-gray-900 truncate">
+            <CardTitle className="flex items-center gap-1 mb-0.5">
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                 {siteData.name}
               </span>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center gap-1">
                 {siteData.isPublic ? (
-                  <Globe className="w-4 h-4 text-success-500" />
+                  <Globe className="w-3 h-3 text-success-500 flex-shrink-0" />
                 ) : (
-                  <Lock className="w-4 h-4 text-gray-400" />
+                  <Lock className="w-3 h-3 text-gray-400 flex-shrink-0" />
                 )}
                 {siteData.ownership === 'shared' && (
-                  <Users className="w-4 h-4 text-primary-500" />
+                  <Users className="w-3 h-3 text-primary-500 flex-shrink-0" />
                 )}
               </div>
             </CardTitle>
 
             {siteData.description && (
-              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+              <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
                 {siteData.description}
               </p>
             )}
 
-            <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-              {siteData.address && (
-                <div className="flex items-center space-x-1">
-                  <MapPin className="w-3 h-3" />
-                  <span className="truncate">{siteData.address}</span>
-                </div>
-              )}
-              {siteData.coordinateSystem && siteData.coordinateSystem !== 'WGS84' && (
-                <Badge variant="outline" size="sm">
-                  {siteData.coordinateSystem}
-                </Badge>
-              )}
-            </div>
+            {siteData.address && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{siteData.address}</span>
+              </div>
+            )}
           </div>
           <div className="relative">
             <Button
               variant="ghost"
               size="icon"
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
               onClick={(event) => {
                 event.stopPropagation()
                 setMenuOpen((prev) => !prev)
               }}
             >
-              <MoreVertical className="w-4 h-4" />
+              <MoreVertical className="w-3 h-3" />
             </Button>
             {menuOpen && (
               <div
-                className="absolute right-0 mt-2 w-44 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10"
+                className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 shadow-lg z-10"
                 onClick={(event) => event.stopPropagation()}
               >
                 <button
@@ -147,9 +139,9 @@ const SiteCard: React.FC<SiteCardProps> = ({
                     setMenuOpen(false)
                     onEdit(site)
                   }}
-                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                  className="flex w-full items-center px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  <Edit3 className="w-4 h-4 mr-2" />
+                  <Edit3 className="w-3 h-3 mr-2" />
                   Modifier
                 </button>
                 <button
@@ -158,9 +150,9 @@ const SiteCard: React.FC<SiteCardProps> = ({
                     setMenuOpen(false)
                     onViewOnMap(site)
                   }}
-                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                  className="flex w-full items-center px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  <Map className="w-4 h-4 mr-2" />
+                  <Map className="w-3 h-3 mr-2" />
                   Voir sur la carte
                 </button>
                 <button
@@ -169,10 +161,10 @@ const SiteCard: React.FC<SiteCardProps> = ({
                     setMenuOpen(false)
                     onSelect(site)
                   }}
-                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                  className="flex w-full items-center px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Voir le dÃ©tail
+                  <ExternalLink className="w-3 h-3 mr-2" />
+                  Voir le détail
                 </button>
                 <button
                   type="button"
@@ -180,9 +172,9 @@ const SiteCard: React.FC<SiteCardProps> = ({
                     setMenuOpen(false)
                     onDelete(site)
                   }}
-                  className="flex w-full items-center px-3 py-2 text-sm text-danger-600 hover:bg-danger-50"
+                  className="flex w-full items-center px-3 py-1.5 text-xs text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/30"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="w-3 h-3 mr-2" />
                   Supprimer
                 </button>
               </div>
@@ -191,54 +183,54 @@ const SiteCard: React.FC<SiteCardProps> = ({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Position */}
+      <CardContent className="space-y-1.5 pt-1.5">
+        {/* Position - Compact */}
         {siteData.lat && siteData.lng ? (
-          <div className="p-3 bg-primary-50 rounded-lg">
+          <div className="p-1.5 bg-primary-50 dark:bg-primary-900/20 rounded">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium text-primary-700">
-                Position GPS
+              <div className="text-xs font-medium text-primary-700 dark:text-primary-400">
+                GPS
               </div>
-              <div className="text-xs font-mono text-primary-600">
+              <div className="text-xs font-mono text-primary-600 dark:text-primary-500">
                 {siteData.lat.toFixed(4)}, {siteData.lng.toFixed(4)}
-                {siteData.altitude && ` â€¢ ${siteData.altitude}m`}
+                {siteData.altitude && ` • ${siteData.altitude}m`}
               </div>
             </div>
           </div>
         ) : (
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <MapPin className="w-4 h-4" />
-              <span>Position non dÃ©finie</span>
+          <div className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded">
+            <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+              <MapPin className="w-3 h-3" />
+              <span>Position non définie</span>
             </div>
           </div>
         )}
 
-        {/* Statistics */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="text-center p-2 bg-gray-50 rounded">
-            <div className="text-lg font-semibold text-primary-600">
+        {/* Statistics - Compact */}
+        <div className="grid grid-cols-2 gap-1.5">
+          <div className="text-center p-1 bg-gray-50 dark:bg-gray-800 rounded">
+            <div className="text-base font-semibold text-primary-600 dark:text-primary-400">
               {statistics.totalInstallations}
             </div>
-            <div className="text-xs text-gray-600">
+            <div className="text-xs text-gray-600 dark:text-gray-400">
               Installations
             </div>
           </div>
 
-          <div className="text-center p-2 bg-gray-50 rounded">
-            <div className="text-lg font-semibold text-success-600">
+          <div className="text-center p-1 bg-gray-50 dark:bg-gray-800 rounded">
+            <div className="text-base font-semibold text-success-600 dark:text-success-400">
               {statistics.activeCampaigns}
             </div>
-            <div className="text-xs text-gray-600">
-              Campagnes actives
+            <div className="text-xs text-gray-600 dark:text-gray-400">
+              Campagnes
             </div>
           </div>
         </div>
 
-        {/* Last Activity */}
+        {/* Last Activity - Compact */}
         {statistics.lastActivity && (
-          <div className="text-xs text-gray-500 text-center">
-            DerniÃ¨re activitÃ©: {formatDistanceToNow(statistics.lastActivity)}
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            {formatDistanceToNow(statistics.lastActivity)}
           </div>
         )}
       </CardContent>
@@ -385,8 +377,8 @@ export const SiteListPage: React.FC = () => {
     return (
       <>
         <PageHeader
-          title="CrÃ©er un nouveau site"
-          description="DÃ©finissez un site gÃ©ographique pour y installer vos devices TrackBee"
+          title="Créer un nouveau site"
+          description="Définissez un site géographique pour y installer vos devices TrackBee"
           breadcrumbs={[
             { label: 'Sites', href: '/sites' },
             { label: 'Nouveau', href: '/sites/new' }
@@ -406,8 +398,8 @@ export const SiteListPage: React.FC = () => {
   return (
     <>
       <PageHeader
-        title="Sites gÃ©ographiques"
-        description="GÃ©rez vos sites de mesure et leurs installations"
+        title="Sites"
+        // description="Gérez vos sites de mesure et leurs installations"
         action={
           <Button
             variant="primary"
@@ -419,121 +411,122 @@ export const SiteListPage: React.FC = () => {
         }
       />
 
-      {/* Filters & Stats */}
-      <Section>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Search & Filters */}
-          <div className="lg:col-span-2 space-y-4">
-            <Input
-              placeholder="Rechercher par nom, adresse, description..."
-              value={filters.search}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              leftIcon={<Search className="w-4 h-4" />}
-            />
+      {/* Filters & Stats - MINIMAL */}
+      {/*<Section className="space-y-2">*/}
+      {/*  <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">*/}
+      {/*    /!* Search & Filters *!/*/}
+      {/*    <div className="lg:col-span-2 space-y-2">*/}
+      {/*      <Input*/}
+      {/*        placeholder="Rechercher par nom, adresse, description..."*/}
+      {/*        value={filters.search}*/}
+      {/*        onChange={(e) => handleSearchChange(e.target.value)}*/}
+      {/*        leftIcon={<Search className="w-4 h-4" />}*/}
+      {/*        className="h-9"*/}
+      {/*      />*/}
 
-            <div className="flex flex-wrap gap-3">
-              <select
-                className="w-40 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={filters.ownership ?? 'all'}
-                onChange={(event) => {
-                  const value = event.target.value as SiteFilters['ownership'] | 'all'
-                  handleFilterChange('ownership', value === 'all' ? undefined : value)
-                }}
-              >
-                <option value="all">Tous les sites</option>
-                <option value="owner">Mes sites</option>
-                <option value="shared">Sites partagÃ©s</option>
-              </select>
+      {/*      <div className="flex flex-wrap gap-2">*/}
+      {/*        <select*/}
+      {/*          className="w-36 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800"*/}
+      {/*          value={filters.ownership ?? 'all'}*/}
+      {/*          onChange={(event) => {*/}
+      {/*            const value = event.target.value as SiteFilters['ownership'] | 'all'*/}
+      {/*            handleFilterChange('ownership', value === 'all' ? undefined : value)*/}
+      {/*          }}*/}
+      {/*        >*/}
+      {/*          <option value="all">Tous les sites</option>*/}
+      {/*          <option value="owner">Mes sites</option>*/}
+      {/*          <option value="shared">Sites partagés</option>*/}
+      {/*        </select>*/}
 
-              <select
-                className="w-44 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={
-                  filters.hasInstallations === undefined
-                    ? 'all'
-                    : filters.hasInstallations
-                      ? 'with'
-                      : 'without'
-                }
-                onChange={(event) => {
-                  const value = event.target.value
-                  handleFilterChange(
-                    'hasInstallations',
-                    value === 'all' ? undefined : value === 'with'
-                  )
-                }}
-              >
-                <option value="all">Toutes installations</option>
-                <option value="with">Avec installations</option>
-                <option value="without">Sans installation</option>
-              </select>
+      {/*        <select*/}
+      {/*          className="w-40 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800"*/}
+      {/*          value={*/}
+      {/*            filters.hasInstallations === undefined*/}
+      {/*              ? 'all'*/}
+      {/*              : filters.hasInstallations*/}
+      {/*                ? 'with'*/}
+      {/*                : 'without'*/}
+      {/*          }*/}
+      {/*          onChange={(event) => {*/}
+      {/*            const value = event.target.value*/}
+      {/*            handleFilterChange(*/}
+      {/*              'hasInstallations',*/}
+      {/*              value === 'all' ? undefined : value === 'with'*/}
+      {/*            )*/}
+      {/*          }}*/}
+      {/*        >*/}
+      {/*          <option value="all">Toutes installations</option>*/}
+      {/*          <option value="with">Avec installations</option>*/}
+      {/*          <option value="without">Sans installation</option>*/}
+      {/*        </select>*/}
 
-              <select
-                className="w-36 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={
-                  filters.isPublic === undefined
-                    ? 'all'
-                    : filters.isPublic
-                      ? 'public'
-                      : 'private'
-                }
-                onChange={(event) => {
-                  const value = event.target.value
-                  handleFilterChange(
-                    'isPublic',
-                    value === 'all' ? undefined : value === 'public'
-                  )
-                }}
-              >
-                <option value="all">Public/PrivÃ©</option>
-                <option value="public">Public</option>
-                <option value="private">PrivÃ©</option>
-              </select>
-            </div>
-          </div>
+      {/*        <select*/}
+      {/*          className="w-32 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800"*/}
+      {/*          value={*/}
+      {/*            filters.isPublic === undefined*/}
+      {/*              ? 'all'*/}
+      {/*              : filters.isPublic*/}
+      {/*                ? 'public'*/}
+      {/*                : 'private'*/}
+      {/*          }*/}
+      {/*          onChange={(event) => {*/}
+      {/*            const value = event.target.value*/}
+      {/*            handleFilterChange(*/}
+      {/*              'isPublic',*/}
+      {/*              value === 'all' ? undefined : value === 'public'*/}
+      {/*            )*/}
+      {/*          }}*/}
+      {/*        >*/}
+      {/*          <option value="all">Public/Privé</option>*/}
+      {/*          <option value="public">Public</option>*/}
+      {/*          <option value="private">Privé</option>*/}
+      {/*        </select>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
 
-          {/* Quick Stats */}
-          <div className="lg:col-span-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-primary-50 rounded-lg">
-                <p className="text-2xl font-bold text-primary-700">
-                  {stats.total}
-                </p>
-                <p className="text-sm text-primary-600">
-                  Total sites
-                </p>
-              </div>
+      {/*    /!* Quick Stats - COMPACT *!/*/}
+      {/*    <div className="lg:col-span-2">*/}
+      {/*      <div className="grid grid-cols-2 gap-2">*/}
+      {/*        <div className="text-center p-1.5 bg-primary-50 dark:bg-primary-900/20 rounded">*/}
+      {/*          <p className="text-lg font-bold text-primary-700 dark:text-primary-400">*/}
+      {/*            {stats.total}*/}
+      {/*          </p>*/}
+      {/*          <p className="text-xs text-primary-600 dark:text-primary-500">*/}
+      {/*            Total sites*/}
+      {/*          </p>*/}
+      {/*        </div>*/}
 
-              <div className="text-center p-3 bg-success-50 rounded-lg">
-                <p className="text-2xl font-bold text-success-700">
-                  {stats.withInstallations}
-                </p>
-                <p className="text-sm text-success-600">
-                  Avec installations
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Section>
+      {/*        <div className="text-center p-1.5 bg-success-50 dark:bg-success-900/20 rounded">*/}
+      {/*          <p className="text-lg font-bold text-success-700 dark:text-success-400">*/}
+      {/*            {stats.withInstallations}*/}
+      {/*          </p>*/}
+      {/*          <p className="text-xs text-success-600 dark:text-success-500">*/}
+      {/*            Avec installations*/}
+      {/*          </p>*/}
+      {/*        </div>*/}
+      {/*      </div>*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*</Section>*/}
 
       {/* View Toggle & Content */}
       <Section>
         <Tabs value={view} onValueChange={(value) => setView(value as 'list' | 'map')}>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-3">
             <TabsList>
-              <TabsTrigger value="list" className="flex items-center space-x-2">
-                <List className="w-4 h-4" />
+              <TabsTrigger value="list" className="flex items-center gap-1.5 text-xs px-2.5 py-1">
+                <List className="w-3 h-3" />
                 <span>Liste</span>
               </TabsTrigger>
-              <TabsTrigger value="map" className="flex items-center space-x-2">
-                <Map className="w-4 h-4" />
+              <TabsTrigger value="map" className="flex items-center gap-1.5 text-xs px-2.5 py-1">
+                <Map className="w-3 h-3" />
                 <span>Carte</span>
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               <select
-                className="w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-44 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800"
                 value={`${sorting.field}-${sorting.direction}`}
                 onChange={(event) => {
                   const [field, direction] = event.target.value.split('-') as [
@@ -543,9 +536,9 @@ export const SiteListPage: React.FC = () => {
                   setSorting({ field, direction })
                 }}
               >
-                <option value="name-asc">Nom A â†’ Z</option>
-                <option value="name-desc">Nom Z â†’ A</option>
-                <option value="createdAt-desc">Plus rÃ©cents</option>
+                <option value="name-asc">Nom A → Z</option>
+                <option value="name-desc">Nom Z → A</option>
+                <option value="createdAt-desc">Plus récents</option>
                 <option value="createdAt-asc">Plus anciens</option>
                 <option value="installationCount-desc">Plus d'installations</option>
                 <option value="installationCount-asc">Moins d'installations</option>
@@ -555,19 +548,19 @@ export const SiteListPage: React.FC = () => {
 
           <TabsContent value="list">
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                {[...Array(8)].map((_, i) => (
                   <Card key={i} className="animate-pulse">
-                    <CardHeader>
-                      <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    <CardHeader className="pb-2">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mt-1"></div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="h-16 bg-gray-200 rounded"></div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="h-12 bg-gray-200 rounded"></div>
-                          <div className="h-12 bg-gray-200 rounded"></div>
+                    <CardContent className="pt-2">
+                      <div className="space-y-2">
+                        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
                         </div>
                       </div>
                     </CardContent>
@@ -579,14 +572,14 @@ export const SiteListPage: React.FC = () => {
                 <div className="text-danger-600 mb-4">
                   <Settings className="w-12 h-12 mx-auto" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                   Erreur de chargement
                 </h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   {error.message}
                 </p>
                 <Button onClick={() => refetch()}>
-                  RÃ©essayer
+                  Réessayer
                 </Button>
               </div>
             ) : sites.length === 0 ? (
@@ -594,13 +587,13 @@ export const SiteListPage: React.FC = () => {
                 <div className="text-gray-400 mb-4">
                   <MapPin className="w-12 h-12 mx-auto" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Aucun site trouvÃ©
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  Aucun site trouvé
                 </h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   {filters.search
-                    ? 'Aucun site ne correspond Ã  votre recherche.'
-                    : 'Commencez par crÃ©er votre premier site de mesure.'
+                    ? 'Aucun site ne correspond à votre recherche.'
+                    : 'Commencez par créer votre premier site de mesure.'
                   }
                 </p>
                 <Button
@@ -608,11 +601,11 @@ export const SiteListPage: React.FC = () => {
                   onClick={() => setShowCreateForm(true)}
                   leftIcon={<Plus className="w-4 h-4" />}
                 >
-                  CrÃ©er un site
+                  Créer un site
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
                 {sites.map((site) => (
                   <SiteCard
                     key={site.site.id}
@@ -652,7 +645,7 @@ export const SiteListPage: React.FC = () => {
         title="Supprimer le site"
         message={
           siteToDelete
-            ? `ÃŠtes-vous sÃ»r de vouloir supprimer le site "${siteToDelete.site.name}" ? Cette action est irrÃ©versible et supprimera Ã©galement toutes les installations associÃ©es.`
+            ? `Êtes-vous sûr de vouloir supprimer le site "${siteToDelete.site.name}" ? Cette action est irréversible et supprimera également toutes les installations associées.`
             : ''
         }
         confirmText="Supprimer"
@@ -669,7 +662,3 @@ SiteListPage.displayName = 'SiteListPage'
 // ==================== EXPORT ====================
 
 export default SiteListPage
-
-
-
-

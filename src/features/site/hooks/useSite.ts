@@ -54,20 +54,37 @@ export const siteQueryKeys = {
  * Récupère un site par ID depuis IndexedDB
  */
 const fetchSite = async (id: SiteId): Promise<Site> => {
-  siteLog.debug('Fetching site from IndexedDB', { id })
+  const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+  siteLog.debug('🔍 Fetching site from IndexedDB', { id, numericId, idType: typeof id })
 
   try {
     const { DataService } = await import('@/core/services/data/DataService')
-    const site = await DataService.getSiteById(id)
+    const { database } = await import('@/core/database/schema')
+
+    // 🔍 DEBUG: Log all sites to see what we have
+    const allSites = await database.sites.toArray()
+    siteLog.debug('📊 All sites in IndexedDB:', {
+      count: allSites.length,
+      siteIds: allSites.map(s => s.id),
+      lookingFor: numericId
+    })
+
+    const site = await DataService.getSiteById(numericId)
 
     if (!site) {
+      siteLog.error('❌ Site not found in IndexedDB', {
+        id,
+        numericId,
+        availableSites: allSites.length,
+        availableIds: allSites.map(s => s.id)
+      })
       throw new AppError(`Site not found: ${id}`, 'SITE_NOT_FOUND')
     }
 
-    siteLog.debug('Site fetched from IndexedDB', { site })
+    siteLog.info('✅ Site fetched from IndexedDB', { siteId: site.id, siteName: site.name })
     return site as Site
   } catch (error) {
-    siteLog.error('Failed to fetch site from IndexedDB', { id, error })
+    siteLog.error('❌ Failed to fetch site from IndexedDB', { id, numericId, error })
     throw error
   }
 }
@@ -76,28 +93,29 @@ const fetchSite = async (id: SiteId): Promise<Site> => {
  * Récupère un bundle complet (site + relations) depuis IndexedDB
  */
 const fetchSiteBundle = async (id: SiteId): Promise<SiteBundle> => {
-  siteLog.debug('Fetching site bundle from IndexedDB', { id })
+  const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+  siteLog.debug('Fetching site bundle from IndexedDB', { id, numericId })
 
   try {
     const { DataService } = await import('@/core/services/data/DataService')
     const { database } = await import('@/core/database/schema')
 
     // Récupérer le site
-    const site = await fetchSite(id)
+    const site = await fetchSite(numericId)
 
     // Récupérer les installations pour ce site
-    const installations = await DataService.getInstallationsBySite(id)
+    const installations = await DataService.getInstallationsBySite(numericId)
 
     // Récupérer les campagnes pour ce site
     const campaigns = await database.campaigns
       .where('siteId')
-      .equals(Number(id))
+      .equals(numericId)
       .toArray()
 
     // Récupérer les calculs pour ce site
     const calculations = await database.calculations
       .where('siteId')
-      .equals(Number(id))
+      .equals(numericId)
       .toArray()
 
     // Récupérer les machines associées aux installations

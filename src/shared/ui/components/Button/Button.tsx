@@ -35,12 +35,12 @@ const buttonVariants = cva(
 
         // Bouton secondaire - minimaliste
         secondary: [
-          'bg-gray-50 text-gray-700 border-gray-200',
-          'hover:bg-gray-100 hover:border-gray-300',
+          'bg-gray-100 text-gray-900 border-gray-300',
+          'hover:bg-gray-200 hover:border-gray-400',
           'focus-visible:ring-gray-400',
-          'active:bg-gray-200',
-          'dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700',
-          'dark:hover:bg-gray-700 dark:hover:border-gray-600',
+          'active:bg-gray-300',
+          'dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600',
+          'dark:hover:bg-gray-600 dark:hover:border-gray-500',
         ],
 
         // Bouton de succès
@@ -69,19 +69,19 @@ const buttonVariants = cva(
 
         // Bouton outline - bordure fine
         outline: [
-          'border-gray-300 bg-white text-gray-700',
-          'hover:bg-gray-50 hover:border-gray-400',
+          'border-gray-300 bg-white text-gray-900',
+          'hover:bg-gray-50 hover:border-gray-400 hover:text-gray-900',
           'focus-visible:ring-gray-400',
-          'dark:border-gray-600 dark:bg-gray-900 dark:text-gray-300',
-          'dark:hover:bg-gray-800 dark:hover:border-gray-500',
+          'dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100',
+          'dark:hover:bg-gray-700 dark:hover:border-gray-500',
         ],
 
         // Bouton ghost - ultra léger
         ghost: [
-          'bg-transparent text-gray-600 border-transparent',
+          'bg-transparent text-gray-700 border-transparent',
           'hover:bg-gray-100 hover:text-gray-900',
           'focus-visible:ring-gray-400',
-          'dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
+          'dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100',
         ],
 
         // Bouton lien - discret

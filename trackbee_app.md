@@ -383,12 +383,20 @@ interface Site {
 
 ### Campaign Management (`src/features/campaign/`)
 ```typescript
-// Types de campagnes GNSS
+// Types de campagnes GNSS (ancienne nomenclature - à migrer vers v2.0)
 enum CampaignType {
-  STATIC_UNIQUE = 'STATIC_UNIQUE',        // Mesure ponctuelle
-  STATIC_MULTIPLE = 'STATIC_MULTIPLE',    // Mesures récurrentes
-  KINEMATIC = 'KINEMATIC'                 // Mobile (futur)
+  STATIC_UNIQUE = 'STATIC_UNIQUE',        // Mesure ponctuelle (→ static_unique_ppk ou static_unique_rtk_*)
+  STATIC_MULTIPLE = 'STATIC_MULTIPLE',    // Mesures récurrentes (→ static_recurrent_ppk ou static_recurrent_rtk_*)
+  KINEMATIC = 'KINEMATIC'                 // Mobile (→ rover)
 }
+
+// **IMPORTANT (v2.0 - 2025-10-18)**: Nouvelle nomenclature backend:
+// - POST /api/sites/:id/machines/:id/available-mission-modes retourne les modes avec nouvelle nomenclature
+// - Modes PPK: static_unique_ppk, static_recurrent_ppk
+// - Modes RTK base locale: static_unique_rtk_base, static_recurrent_rtk_base, rover
+// - Modes RTK NTRIP: static_unique_rtk_ntrip, static_recurrent_rtk_ntrip, rover
+// - Mode base: base
+// Documentation complète: trackbee_back2/MISSION_MODES_NOMENCLATURE.md
 
 // Workflow création campagne
 const campaign = await createCampaign({
@@ -856,6 +864,77 @@ VITE_DEBUG_BLE=true
 3. TestFlight beta → App Store review
 4. Production release
 ```
+
+---
+
+## 📋 TODO - Backend ↔ IoT Communication (Phase 2)
+
+**À implémenter** : Intégration de la communication bidirectionnelle Backend ↔ IoT via API REST
+
+### Hooks à créer
+
+**`useMachineStatus(machineId: number)`** - Récupération statut temps réel
+```typescript
+// src/features/device/hooks/useMachineStatus.ts
+interface MachineStatus {
+  isOnline: boolean;
+  lastHeartbeat: string;
+  minutesSinceHeartbeat: number;
+  batteryLevel: number;
+  gnssStatus: 'off' | 'acquiring' | 'rtk_fixed' | ...;
+  rtkEnabled: boolean;
+  rtkSource: 'none' | 'local_base' | 'ntrip';
+  missionStatus: 'idle' | 'recording' | ...;
+  activeMissionId: number | null;
+}
+
+// GET /api/machines/:id/status (polling toutes les 30s)
+```
+
+**`useMachineCommands(machineId: number)`** - Gestion commandes
+```typescript
+// src/features/device/hooks/useMachineCommands.ts
+const {
+  createCommand,
+  startRTKNtrip,
+  stopMission,
+  syncRTC,
+  listCommands
+} = useMachineCommands(machineId);
+
+// POST /api/machines/:id/commands
+// GET /api/machines/:id/commands (historique)
+```
+
+### Composants à créer
+
+**`<MachineStatusCard />`** - Affichage statut temps réel
+- Badge online/offline avec dernière connexion
+- Niveau batterie
+- Statut GNSS (off, acquiring, rtk_fixed)
+- Statut RTK (source, qualité)
+- Mission active
+- Stockage
+
+**`<MachineCommandHistory />`** - Historique des commandes
+- Liste des commandes envoyées
+- Statuts (pending, executing, completed, failed)
+- Résultats et erreurs
+
+**`<StartRTKButton />`** - Bouton démarrage RTK NTRIP
+- Formulaire config NTRIP (caster, mountpoint, credentials)
+- Envoi commande `enable_rtk_ntrip`
+- Notification ACK + polling statut
+
+### Intégration
+
+**Documentation complète** : Voir `BACKEND_IOT_COMMUNICATION.md` côté backend pour :
+- API endpoints disponibles
+- Format JSON des payloads
+- Exemples de code React complets
+- Gestion polling et notifications temps réel
+
+**Priorité** : Phase 2 backend opérationnelle → Intégration frontend à faire
 
 ---
 

@@ -542,6 +542,15 @@ export const useDevice = (deviceId: number): UseDeviceDetailReturn => {
       // Marquer comme en cours de connexion
       setBleConnectionState(deviceId, { isConnecting: true })
 
+      // Notifier le backend - connexion en cours
+      try {
+        await httpClient.patch(`/api/machine/${deviceId}/ble-status`, {
+          bleStatus: 'connecting'
+        })
+      } catch (backendError) {
+        deviceLog.warn('Failed to update backend connection status (non-critical)', backendError)
+      }
+
       // Scanner pour trouver le device
       const scanResults = await bleManager.scanForDevices({
         timeout: 15000,
@@ -555,6 +564,15 @@ export const useDevice = (deviceId: number): UseDeviceDetailReturn => {
       )
 
       if (!targetDevice) {
+        // Notifier le backend - échec scan
+        try {
+          await httpClient.patch(`/api/machine/${deviceId}/ble-status`, {
+            bleStatus: 'error',
+            bleError: 'Device not found during BLE scan'
+          })
+        } catch (backendError) {
+          deviceLog.warn('Failed to update backend error status (non-critical)', backendError)
+        }
         throw createDeviceError('BLE_SCAN_FAILED')
       }
 
@@ -562,13 +580,26 @@ export const useDevice = (deviceId: number): UseDeviceDetailReturn => {
       const connection = await bleManager.connect(targetDevice.deviceId)
       const deviceId_ble = connection.deviceId
 
-      // Mettre à jour l'état
+      // Mettre à jour l'état local
       setBleConnection(deviceId, {
         status: 'connected',
         deviceId: deviceId_ble,
         lastConnection: new Date(),
-        isConnecting: false
+        isConnecting: false,
+        rssi: targetDevice.rssi
       })
+
+      // Notifier le backend - connexion réussie
+      try {
+        await httpClient.patch(`/api/machine/${deviceId}/ble-status`, {
+          bleStatus: 'connected',
+          bleDeviceId: deviceId_ble,
+          bleRssi: targetDevice.rssi || undefined
+        })
+        deviceLog.debug('Backend notified of successful BLE connection', { deviceId })
+      } catch (backendError) {
+        deviceLog.warn('Failed to update backend connected status (non-critical)', backendError)
+      }
 
       // Auto-probe des fichiers si demandé
       if (options.autoProbeFiles !== false) {
@@ -585,11 +616,22 @@ export const useDevice = (deviceId: number): UseDeviceDetailReturn => {
 
     } catch (error) {
       // Nettoyer l'état en cas d'erreur
+      const errorMessage = (error as Error).message
       setBleConnectionState(deviceId, {
         status: 'error',
         isConnecting: false,
-        error: (error as Error).message
+        error: errorMessage
       })
+
+      // Notifier le backend - erreur de connexion
+      try {
+        await httpClient.patch(`/api/machine/${deviceId}/ble-status`, {
+          bleStatus: 'error',
+          bleError: errorMessage
+        })
+      } catch (backendError) {
+        deviceLog.warn('Failed to update backend error status (non-critical)', backendError)
+      }
 
       options.onError?.(error as Error)
       deviceLog.error('Device connection failed', error)
@@ -613,8 +655,18 @@ export const useDevice = (deviceId: number): UseDeviceDetailReturn => {
     try {
       await bleManager.disconnect(connection.deviceId)
 
-      // Mettre à jour l'état
+      // Mettre à jour l'état local
       removeBleConnection(deviceId)
+
+      // Notifier le backend - déconnexion
+      try {
+        await httpClient.patch(`/api/machine/${deviceId}/ble-status`, {
+          bleStatus: 'disconnected'
+        })
+        deviceLog.debug('Backend notified of BLE disconnection', { deviceId })
+      } catch (backendError) {
+        deviceLog.warn('Failed to update backend disconnection status (non-critical)', backendError)
+      }
 
       // Événement global
       eventBus.emit({ type: 'ble:disconnected', data: { deviceId: String(deviceId) } } as any)
@@ -623,6 +675,17 @@ export const useDevice = (deviceId: number): UseDeviceDetailReturn => {
 
     } catch (error) {
       deviceLog.error('Device disconnection failed', error)
+
+      // Notifier le backend de l'erreur même en cas d'échec de déconnexion
+      try {
+        await httpClient.patch(`/api/machine/${deviceId}/ble-status`, {
+          bleStatus: 'error',
+          bleError: `Disconnection failed: ${(error as Error).message}`
+        })
+      } catch (backendError) {
+        deviceLog.warn('Failed to update backend error status (non-critical)', backendError)
+      }
+
       throw createDeviceError('BLE_CONNECTION_FAILED', error as Error)
     }
   }, [deviceId, bleConnection, eventBus, removeBleConnection])

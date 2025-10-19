@@ -1,5 +1,5 @@
 /**
- * DeviceListPage Component - Page de liste des devices IoT
+ * DeviceListPage Component - Page de liste des devices IoT (COMPACT DESIGN)
  * Interface principale pour visualiser, gérer et scanner des devices TrackBee
  */
 
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 
 // UI Components imports
-import { AppLayout, PageHeader, Section } from '@/shared/ui/components/Layout'
+import { PageHeader, Section } from '@/shared/ui/components/Layout'
 import { Card, CardHeader, CardTitle, CardContent } from '@/shared/ui/components/Card/Card'
 import { Button } from '@/shared/ui/components/Button/Button'
 import { Input } from '@/shared/ui/components/Input/Input'
@@ -54,7 +54,7 @@ interface DeviceFilters {
   siteId?: number
 }
 
-// ==================== DEVICE CARD COMPONENT ====================
+// ==================== DEVICE CARD COMPONENT (COMPACT) ====================
 
 interface DeviceCardProps {
   device: DeviceBundle
@@ -84,13 +84,13 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       className="transition-all duration-200 hover:shadow-md cursor-pointer group"
       onClick={() => onSelect(device)}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <CardTitle className="flex items-center space-x-3">
-              <h3 className="text-lg font-semibold text-gray-900 truncate">
+            <CardTitle className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
                 {machine.name}
-              </h3>
+              </span>
 
               <DeviceConnectionPill
                 deviceId={machine.id}
@@ -100,24 +100,24 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
             </CardTitle>
 
             {machine.description && (
-              <p className="text-sm text-gray-600 mt-1 truncate">
+              <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1">
                 {machine.description}
               </p>
             )}
 
-            <div className="flex items-center space-x-4 mt-2">
-              <Badge variant="outline" size="sm" className="font-mono text-xs">
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <Badge variant="outline" size="sm" className="font-mono text-xs px-1.5 py-0.5">
                 {machine.macAddress}
               </Badge>
 
               {machine.model && (
-                <Badge variant="secondary" size="sm">
+                <Badge variant="secondary" size="sm" className="text-xs px-1.5 py-0.5">
                   {machine.model}
                 </Badge>
               )}
 
               {!machine.isActive && (
-                <Badge variant="danger" size="sm">
+                <Badge variant="danger" size="sm" className="text-xs px-1.5 py-0.5">
                   Inactif
                 </Badge>
               )}
@@ -126,18 +126,18 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
           <div className="relative">
             <Button
               variant="ghost"
-              size="sm"
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
+              size="icon"
+              className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
               onClick={(event) => {
                 event.stopPropagation()
                 setMenuOpen((prev) => !prev)
               }}
             >
-              <MoreVertical className="w-4 h-4" />
+              <MoreVertical className="w-3 h-3" />
             </Button>
             {menuOpen && (
               <div
-                className="absolute right-0 mt-2 w-40 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10"
+                className="absolute right-0 mt-2 w-36 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 py-1 shadow-lg z-10"
                 onClick={(event) => event.stopPropagation()}
               >
                 <button
@@ -146,9 +146,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
                     setMenuOpen(false)
                     onEdit(device)
                   }}
-                  className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                  className="flex w-full items-center px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  <Edit3 className="w-4 h-4 mr-2" />
+                  <Edit3 className="w-3 h-3 mr-2" />
                   Modifier
                 </button>
                 {site && (
@@ -158,9 +158,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
                       setMenuOpen(false)
                       onNavigateToSite(site.id)
                     }}
-                    className="flex w-full items-center px-3 py-2 text-sm hover:bg-gray-100"
+                    className="flex w-full items-center px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
+                    <ExternalLink className="w-3 h-3 mr-2" />
                     Voir le site
                   </button>
                 )}
@@ -170,9 +170,9 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
                     setMenuOpen(false)
                     onDelete(device)
                   }}
-                  className="flex w-full items-center px-3 py-2 text-sm text-danger-600 hover:bg-danger-50"
+                  className="flex w-full items-center px-3 py-1.5 text-xs text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/30"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="w-3 h-3 mr-2" />
                   Supprimer
                 </button>
               </div>
@@ -181,73 +181,75 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Site Association */}
+      <CardContent className="space-y-2 pt-2">
+        {/* Site Association - Compact */}
         {site && installation ? (
-          <div className="flex items-center space-x-2 p-3 bg-primary-50 rounded-md">
-            <MapPin className="w-4 h-4 text-primary-600" />
+          <div className="flex items-center gap-1.5 p-2 bg-primary-50 dark:bg-primary-900/20 rounded">
+            <MapPin className="w-3 h-3 text-primary-600 dark:text-primary-400 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-primary-700 truncate">
+              <p className="text-xs font-medium text-primary-700 dark:text-primary-400 truncate">
                 {site.name}
               </p>
-              <p className="text-xs text-primary-600 truncate">
-                Installation: {installation.name || 'Sans nom'}
+              <p className="text-xs text-primary-600 dark:text-primary-500 truncate">
+                {installation.name || 'Sans nom'}
               </p>
             </div>
           </div>
         ) : (
-          <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-md">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            <p className="text-sm text-gray-600">
+          <div className="flex items-center gap-1.5 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+            <MapPin className="w-3 h-3 text-gray-400 flex-shrink-0" />
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               Non associé à un site
             </p>
           </div>
         )}
 
-        {/* Statistics */}
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div className="p-2 bg-gray-50 rounded">
-            <p className="text-lg font-semibold text-gray-900">
+        {/* Statistics - Compact */}
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded">
+            <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {connectedCampaigns}
             </p>
-            <p className="text-xs text-gray-600">
-              Campagnes actives
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Campagnes
             </p>
           </div>
 
-          <div className="p-2 bg-gray-50 rounded">
-            <p className="text-lg font-semibold text-gray-900">
+          <div className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded">
+            <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {calculations.length}
             </p>
-            <p className="text-xs text-gray-600">
-              Calculs total
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Calculs
             </p>
           </div>
         </div>
 
-        {/* Last Activity */}
+        {/* Last Activity - Compact */}
         {lastCalculation && (
-          <div className="text-xs text-gray-500 text-center">
-            Dernier calcul: {formatDistanceToNow(new Date(lastCalculation.createdAt))}
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            {formatDistanceToNow(new Date(lastCalculation.createdAt))}
           </div>
         )}
 
-        {/* File Download Interface */}
-        <DeviceFileDownload
-          deviceId={machine.id}
-          onDownloadComplete={(files) => {
-            deviceListLog.info('Files downloaded from device card', {
-              deviceId: machine.id,
-              fileCount: files.length
-            })
-          }}
-          onError={(error) => {
-            deviceListLog.error('File download error from card', {
-              deviceId: machine.id,
-              error
-            })
-          }}
-        />
+        {/* File Download Interface - Compact */}
+        <div className="pt-1">
+          <DeviceFileDownload
+            deviceId={machine.id}
+            onDownloadComplete={(files) => {
+              deviceListLog.info('Files downloaded from device card', {
+                deviceId: machine.id,
+                fileCount: files.length
+              })
+            }}
+            onError={(error) => {
+              deviceListLog.error('File download error from card', {
+                deviceId: machine.id,
+                error
+              })
+            }}
+          />
+        </div>
       </CardContent>
     </Card>
   )
@@ -386,16 +388,17 @@ export const DeviceListPage: React.FC = () => {
   // ==================== RENDER ====================
 
   return (
-    <AppLayout title="Devices TrackBee">
+    <>
       <PageHeader
         title="Devices TrackBee"
         description="Gérez vos devices IoT, surveillez les connexions et téléchargez les données"
         action={
-          <div className="flex space-x-3">
+          <div className="flex gap-2">
             <Button
               variant="outline"
               leftIcon={<Bluetooth className="w-4 h-4" />}
               onClick={() => setShowScanModal(true)}
+              className="h-9 text-xs px-3"
             >
               Scanner
             </Button>
@@ -404,6 +407,7 @@ export const DeviceListPage: React.FC = () => {
               variant="primary"
               leftIcon={<Plus className="w-4 h-4" />}
               onClick={() => navigate('/devices/new')}
+              className="h-9 text-xs px-3"
             >
               Nouveau device
             </Button>
@@ -411,16 +415,17 @@ export const DeviceListPage: React.FC = () => {
         }
       />
 
-      {/* Filters & Stats */}
-      <Section>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Filters & Stats - COMPACT */}
+      <Section className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           {/* Search & Filters */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className="lg:col-span-2 space-y-2">
             <Input
               placeholder="Rechercher par nom, MAC, site..."
               value={filters.search}
               onChange={(e) => handleSearchChange(e.target.value)}
               leftIcon={<Search className="w-4 h-4" />}
+              className="h-9"
             />
 
             <div className="flex flex-wrap gap-2">
@@ -428,6 +433,7 @@ export const DeviceListPage: React.FC = () => {
                 variant={filters.connected === undefined ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => handleConnectionFilter(undefined)}
+                className="h-7 text-xs px-3"
               >
                 Tous
               </Button>
@@ -435,6 +441,7 @@ export const DeviceListPage: React.FC = () => {
                 variant={filters.connected === true ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => handleConnectionFilter(true)}
+                className="h-7 text-xs px-3"
               >
                 Connectés
               </Button>
@@ -442,29 +449,30 @@ export const DeviceListPage: React.FC = () => {
                 variant={filters.connected === false ? 'primary' : 'outline'}
                 size="sm"
                 onClick={() => handleConnectionFilter(false)}
+                className="h-7 text-xs px-3"
               >
                 Déconnectés
               </Button>
             </div>
           </div>
 
-          {/* Quick Stats */}
+          {/* Quick Stats - COMPACT */}
           <div className="lg:col-span-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-primary-50 rounded-lg">
-                <p className="text-2xl font-bold text-primary-700">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="text-center p-1.5 bg-primary-50 dark:bg-primary-900/20 rounded">
+                <p className="text-lg font-bold text-primary-700 dark:text-primary-400">
                   {stats.total}
                 </p>
-                <p className="text-sm text-primary-600">
+                <p className="text-xs text-primary-600 dark:text-primary-500">
                   Total devices
                 </p>
               </div>
 
-              <div className="text-center p-3 bg-success-50 rounded-lg">
-                <p className="text-2xl font-bold text-success-700">
+              <div className="text-center p-1.5 bg-success-50 dark:bg-success-900/20 rounded">
+                <p className="text-lg font-bold text-success-700 dark:text-success-400">
                   {stats.connected}
                 </p>
-                <p className="text-sm text-success-600">
+                <p className="text-xs text-success-600 dark:text-success-500">
                   Connectés
                 </p>
               </div>
@@ -473,22 +481,22 @@ export const DeviceListPage: React.FC = () => {
         </div>
       </Section>
 
-      {/* Device Grid */}
+      {/* Device Grid - COMPACT */}
       <Section>
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[...Array(8)].map((_, i) => (
               <Card key={i} className="animate-pulse">
-                <CardHeader>
-                  <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                <CardHeader className="pb-2">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mt-1"></div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="h-12 bg-gray-200 rounded"></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-12 bg-gray-200 rounded"></div>
-                      <div className="h-12 bg-gray-200 rounded"></div>
+                <CardContent className="pt-2">
+                  <div className="space-y-2">
+                    <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
                     </div>
                   </div>
                 </CardContent>
@@ -500,10 +508,10 @@ export const DeviceListPage: React.FC = () => {
             <div className="text-danger-600 mb-4">
               <Settings className="w-12 h-12 mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
               Erreur de chargement
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               {error.message}
             </p>
             <Button onClick={() => refetch()}>
@@ -515,16 +523,16 @@ export const DeviceListPage: React.FC = () => {
             <div className="text-gray-400 mb-4">
               <Bluetooth className="w-12 h-12 mx-auto" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
               Aucun device trouvé
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               {filters.search
                 ? 'Aucun device ne correspond à votre recherche.'
                 : 'Commencez par scanner ou créer votre premier device TrackBee.'
               }
             </p>
-            <div className="flex justify-center space-x-3">
+            <div className="flex justify-center gap-3">
               <Button
                 variant="outline"
                 onClick={() => setShowScanModal(true)}
@@ -542,7 +550,7 @@ export const DeviceListPage: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {filteredDevices.map((device) => (
               <DeviceCard
                 key={device.machine.id}
@@ -580,7 +588,7 @@ export const DeviceListPage: React.FC = () => {
         confirmText="Supprimer"
         variant="danger"
       />
-    </AppLayout>
+    </>
   )
 }
 
@@ -588,23 +596,6 @@ export const DeviceListPage: React.FC = () => {
 
 DeviceListPage.displayName = 'DeviceListPage'
 
-// ==================== EXAMPLES ====================
+// ==================== EXPORT ====================
 
-/**
- * Exemples d'utilisation:
- *
- * // Route de base pour la liste des devices
- * <Route path="/devices" element={<DeviceListPage />} />
- *
- * // Dans le routeur principal avec protection
- * <Route path="/devices" element={
- *   <AuthGuard>
- *     <DeviceListPage />
- *   </AuthGuard>
- * } />
- *
- * // Navigation programmatique
- * const navigateToDevices = () => {
- *   navigate('/devices')
- * }
- */
+export default DeviceListPage

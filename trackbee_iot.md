@@ -1,5 +1,8 @@
 # 📡 TrackBee IoT - ESP32-C6 + simpleRTK2B
 
+commande de debug : exemple : 'debug_iot -Port COM11 -DeviceMac 54:32:04:01:41:E6'
+
+
 ## 📋 Vue d'ensemble
 
 repertoire du projet :'C:\Users\fanjo\Documents\1. Dev\2. Projet - Site\12.FTTOPO\2.TrackBee\3.Dev\1.IOT\3.Code\trackbee_v7'
@@ -83,6 +86,10 @@ activate       // Reset configuration WiFi
 
 // Protocol JSON Commands
 {
+  "cmd": "health"                       // ✨ État système + version + commandes disponibles
+}
+
+{
   "cmd": "list_jobs"                    // Liste campagnes actives
 }
 
@@ -96,10 +103,14 @@ activate       // Reset configuration WiFi
 }
 
 {
-  "cmd": "get_files",                   // Récupérer fichiers
+  "cmd": "get_files",                   // Récupérer fichiers d'une campagne
   "campaignId": 123,
   "meta": true,                        // Métadonnées seulement
   "wifi": true                         // Activer SoftAP pour download
+}
+
+{
+  "cmd": "list_all_files"               // ✨ NOUVEAU: Liste TOUS les fichiers (toutes campagnes)
 }
 
 {
@@ -117,6 +128,30 @@ activate       // Reset configuration WiFi
 
 ### Réponses JSON Typiques
 ```json
+// ✨ Health - État système complet
+{
+  "ok": true,
+  "version": "7.0.0",
+  "ble_connected": true,
+  "capture_running": false,
+  "jobs_total": 2,
+  "jobs_enabled": 1,
+  "commands": [
+    "health",
+    "list_jobs",
+    "list_all_files",
+    "add_job (id*, mode, duration_s*, time, period_s, nofix, compress)",
+    "del_job (id*)",
+    "get_files (campaignId*, meta, wifi)",
+    "delete_files (id*)",
+    "instant (id*, duration_s*, nofix, cleanup)",
+    "sync_time (timestamp*)",
+    "wifi_ap_off",
+    "ack_file (name*)",
+    "commit_files (campaignId, files*)"
+  ]
+}
+
 // Liste des jobs
 {
   "ok": true,
@@ -133,7 +168,7 @@ activate       // Reset configuration WiFi
   ]
 }
 
-// Métadonnées fichiers
+// Métadonnées fichiers (campagne spécifique)
 {
   "ok": true,
   "count": 3,
@@ -149,6 +184,34 @@ activate       // Reset configuration WiFi
   ]
 }
 
+// ✨ NOUVEAU: Liste TOUS les fichiers (toutes campagnes)
+{
+  "ok": true,
+  "count": 5,
+  "files": [
+    {
+      "campaignId": 999,
+      "name": "999_19700101_000803.ubx",
+      "size": 18698
+    },
+    {
+      "campaignId": 1000,
+      "name": "1000_20250929_080000.ubx",
+      "size": 2048576
+    },
+    {
+      "campaignId": 1000,
+      "name": "1000_20250930_080000.ubx",
+      "size": 2100000
+    },
+    {
+      "campaignId": 1001,
+      "name": "1001_20251001_120000.ubx",
+      "size": 1850000
+    }
+  ]
+}
+
 // Activation WiFi SoftAP
 {
   "ok": true,
@@ -156,6 +219,57 @@ activate       // Reset configuration WiFi
   "password": "trackbee123",
   "ip": "192.168.4.1",
   "serverUrl": "http://192.168.4.1:8080"
+}
+```
+
+---
+
+---
+
+## 🔍 Commandes BLE Détaillées
+
+### Commande `health` - Auto-découverte du firmware
+
+La commande `health` est le point d'entrée principal pour interroger l'état du système. Elle retourne :
+
+**Informations système :**
+- `version` : Version du firmware (ex: "7.0.0")
+- `ble_connected` : État de la connexion BLE
+- `capture_running` : Enregistrement GNSS en cours
+- `jobs_total` : Nombre total de jobs configurés
+- `jobs_enabled` : Nombre de jobs actifs
+
+**Liste des commandes disponibles :**
+- Format : `"nom_commande (param1*, param2)"`
+- Paramètre avec `*` = **obligatoire**
+- Paramètre sans `*` = **optionnel**
+
+**Usage recommandé :**
+1. **Au démarrage de l'app mobile** : Vérifier version firmware
+2. **Vérification compatibilité** : Comparer version firmware vs app
+3. **Auto-découverte API** : Parser la liste des commandes disponibles
+4. **Monitoring santé** : Vérifier état BLE et capture en cours
+
+**Exemple d'utilisation :**
+```json
+// Requête
+{"cmd":"health"}
+
+// Réponse
+{
+  "ok": true,
+  "version": "7.0.0",
+  "ble_connected": true,
+  "capture_running": false,
+  "jobs_total": 2,
+  "jobs_enabled": 1,
+  "commands": [
+    "health",
+    "list_jobs",
+    "list_all_files",
+    "add_job (id*, mode, duration_s*, time, period_s, nofix, compress)",
+    // ... 9 autres commandes
+  ]
 }
 ```
 
@@ -214,10 +328,17 @@ UBX-CFG-RTK:  Enable RTK corrections
 
 ### Jobs GNSS et Scheduling
 ```c
-// Types de campagnes (mode)
+// Types de campagnes (mode) - FIRMWARE IoT
 MODE_ONCE = 0       // Mesure unique (immédiate ou programmée)
 MODE_DAILY = 1      // Répétition quotidienne (time_of_day_min)
 MODE_PERIODIC = 2   // Répétition périodique (period_s)
+
+// ⚠️ NOTE: Ces modes firmware sont mappés vers la nomenclature backend v2.0:
+//   MODE_ONCE     → static_unique_ppk, static_unique_rtk_base, static_unique_rtk_ntrip
+//   MODE_DAILY    → static_recurrent_ppk, static_recurrent_rtk_base, static_recurrent_rtk_ntrip
+//   MODE_PERIODIC → static_recurrent_ppk, static_recurrent_rtk_base, static_recurrent_rtk_ntrip
+//   + Mode rover (cinématique) pour déplacements
+// Documentation: trackbee_back2/MISSION_MODES_NOMENCLATURE.md
 
 // Algorithme de scheduling
 1. Check RTC toutes les secondes
@@ -391,6 +512,48 @@ npm run dev
 - 🔧 **Compression**: Files .ubx compressés (gzip)
 - 🔧 **Base Station**: Support correction RTK externe
 - 🔧 **LoRaWAN**: Communication longue distance (optionnel)
+
+### TODO - Backend ↔ IoT Communication (Phase 2)
+
+**À implémenter** : Communication bidirectionnelle via HTTP Polling (architecture définie côté backend)
+
+**Endpoints à implémenter** :
+1. **Polling des commandes** (toutes les 10-30s)
+   - `GET https://api.trackbee.com/api/machines/:id/commands/pending`
+   - Récupérer les commandes pending (enable_rtk_ntrip, stop_mission, sync_rtc, reboot, etc.)
+
+2. **Heartbeat + statut** (toutes les 30-60s)
+   - `POST https://api.trackbee.com/api/machines/:id/heartbeat`
+   - Envoyer : batterie, GPS, RTK, missions, stockage, diagnostics
+
+3. **ACK exécution commandes**
+   - `POST https://api.trackbee.com/api/machines/:id/commands/:cmdId/ack`
+   - Statuts : executing, completed, failed
+
+**Fonctions ESP32 à créer** :
+```cpp
+// main.cpp - Polling loop
+void pollCommands();          // GET /commands/pending
+void sendHeartbeat();         // POST /heartbeat
+void executeCommand(cmd);     // Exécuter commande reçue
+void acknowledgeCommand(id);  // POST /ack
+
+// Types de commandes à gérer
+- start_mission
+- stop_mission
+- enable_rtk_ntrip (NTRIP caster config)
+- disable_rtk
+- sync_rtc
+- reboot
+- update_config
+- delete_files
+```
+
+**Documentation complète** : Voir `BACKEND_IOT_COMMUNICATION.md` côté backend pour :
+- Architecture HTTP Polling détaillée
+- Exemples de code ESP32-C6 complets
+- Format JSON des payloads
+- Gestion d'erreurs et retry logic
 
 ### Intégration Ecosystem
 - 📱 **TrackBee App2**: Interface mobile React/Capacitor

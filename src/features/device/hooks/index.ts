@@ -6,6 +6,7 @@
 export { useDevice, deviceQueryKeys } from './useDevice'
 export { useDeviceList } from './useDeviceList'
 export { useDeviceScan } from './useDeviceScan'
+export { useMissionModes } from './useMissionModes'
 
 // Re-export types for convenience
 export type {
@@ -13,3 +14,8 @@ export type {
   UseDeviceListReturn,
   UseDeviceScanReturn
 } from '../types'
+
+export type {
+  UseMissionModesParams,
+  UseMissionModesResult
+} from './useMissionModes'

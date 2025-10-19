@@ -73,18 +73,24 @@ const sortSites = (bundles: SiteBundle[], sorting: SiteSorting): SiteBundle[] =>
       case 'name':
         result = compareStrings(a.site.name ?? '', b.site.name ?? '')
         break
-      case 'createdAt':
-        result = compareNumbers(
-          a.site.createdAt ? (a.site.createdAt instanceof Date ? a.site.createdAt.getTime() : new Date(a.site.createdAt).getTime()) : 0,
-          b.site.createdAt ? (b.site.createdAt instanceof Date ? b.site.createdAt.getTime() : new Date(b.site.createdAt).getTime()) : 0
-        )
+      case 'createdAt': {
+        const getTime = (date: Date | string | undefined | null): number => {
+          if (!date) return 0
+          if (date instanceof Date) return date.getTime()
+          return new Date(date).getTime()
+        }
+        result = compareNumbers(getTime(a.site.createdAt), getTime(b.site.createdAt))
         break
-      case 'updatedAt':
-        result = compareNumbers(
-          a.site.updatedAt ? (a.site.updatedAt instanceof Date ? a.site.updatedAt.getTime() : new Date(a.site.updatedAt).getTime()) : 0,
-          b.site.updatedAt ? (b.site.updatedAt instanceof Date ? b.site.updatedAt.getTime() : new Date(b.site.updatedAt).getTime()) : 0
-        )
+      }
+      case 'updatedAt': {
+        const getTime = (date: Date | string | undefined | null): number => {
+          if (!date) return 0
+          if (date instanceof Date) return date.getTime()
+          return new Date(date).getTime()
+        }
+        result = compareNumbers(getTime(a.site.updatedAt), getTime(b.site.updatedAt))
         break
+      }
       case 'installationCount':
         result = compareNumbers(a.installations.length, b.installations.length)
         break
@@ -186,14 +192,16 @@ const fetchSiteBundles = async (
     // 🔍 DEBUG: Log first site structure
     if (sorted.length > 0) {
       const firstSite = sorted[0]
-      siteListLog.debug('🔍 First site structure:', {
-        'site.id': firstSite.site.id,
-        'site.id type': typeof firstSite.site.id,
-        'site.name': firstSite.site.name,
-        'site.lat': firstSite.site.lat,
-        'site.lng': firstSite.site.lng,
-        'site object keys': Object.keys(firstSite.site)
-      })
+      if (firstSite) {
+        siteListLog.debug('🔍 First site structure:', {
+          'site.id': firstSite.site.id,
+          'site.id type': typeof firstSite.site.id,
+          'site.name': firstSite.site.name,
+          'site.lat': firstSite.site.lat,
+          'site.lng': firstSite.site.lng,
+          'site object keys': Object.keys(firstSite.site)
+        })
+      }
     }
 
     siteListLog.info('✅ Sites loaded from IndexedDB (hydrated cache)', {

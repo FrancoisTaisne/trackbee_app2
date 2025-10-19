@@ -207,7 +207,8 @@ export class TrackBeeDatabase extends Dexie {
 
     // Version 1: Schema initial
     // Version 2: Added siteId and machineId indexes to campaigns table
-    this.version(2).stores({
+    // Version 3: Added siteId index to calculations table
+    this.version(3).stores({
       // Tables principales avec index optimisés
       users: '&id, email, syncedAt',
 
@@ -219,7 +220,7 @@ export class TrackBeeDatabase extends Dexie {
 
       campaigns: '&id, installationId, siteId, machineId, type, status, syncedAt, isMonitoring, priority, lastFileAt',
 
-      calculations: '&id, campaignId, status, syncedAt, retryCount',
+      calculations: '&id, campaignId, siteId, status, syncedAt, retryCount',
 
       files: '&id, filename, campaignId, calculationId, machineId, syncedAt, uploadedAt, source, isAvailableOffline',
 

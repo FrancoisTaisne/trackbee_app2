@@ -5,3 +5,4 @@
 
 export { DeviceListPage } from './DeviceListPage'
 export { DeviceDetailPage } from './DeviceDetailPage'
+export { default as DevicesListPage } from './DevicesListPage'

@@ -53,7 +53,7 @@ const DevicesListPage: React.FC = () => {
                   onClick={() => setShowScanModal(true)}
                   className={cn(
                     'inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg',
-                    'bg-trackbee-500 text-white hover:bg-trackbee-600',
+                    'bg-trackbee-500  hover:bg-trackbee-600',
                     'transition-colors duration-200 shadow-sm hover:shadow-md'
                   )}
                 >
@@ -68,43 +68,43 @@ const DevicesListPage: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher par nom ou adresse MAC..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={cn(
-                  'w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600',
-                  'rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100',
-                  'focus:ring-2 focus:ring-trackbee-500 focus:border-transparent'
-                )}
-              />
-            </div>
+        {/*<div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">*/}
+          {/*<div className="flex flex-col sm:flex-row gap-4">*/}
+          {/*  /!* Search *!/*/}
+          {/*  <div className="flex-1 relative">*/}
+          {/*    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />*/}
+          {/*    <input*/}
+          {/*      type="text"*/}
+          {/*      placeholder="Rechercher par nom ou adresse MAC..."*/}
+          {/*      value={searchTerm}*/}
+          {/*      onChange={(e) => setSearchTerm(e.target.value)}*/}
+          {/*      className={cn(*/}
+          {/*        'w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600',*/}
+          {/*        'rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100',*/}
+          {/*        'focus:ring-2 focus:ring-trackbee-500 focus:border-transparent'*/}
+          {/*      )}*/}
+          {/*    />*/}
+          {/*  </div>*/}
 
-            {/* Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400" />
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as 'disconnected' | 'connected' | 'all')}
-                className={cn(
-                  'px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg',
-                  'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100',
-                  'focus:ring-2 focus:ring-trackbee-500 focus:border-transparent'
-                )}
-              >
-                <option value="all">Tous</option>
-                <option value="connected">Connectés</option>
-                <option value="disconnected">Déconnectés</option>
-              </select>
-            </div>
-          </div>
-        </div>
+          {/*  /!* Filter *!/*/}
+          {/*  <div className="flex items-center gap-2">*/}
+          {/*    <Filter className="w-4 h-4 text-gray-400" />*/}
+          {/*    <select*/}
+          {/*      value={filter}*/}
+          {/*      onChange={(e) => setFilter(e.target.value as 'disconnected' | 'connected' | 'all')}*/}
+          {/*      className={cn(*/}
+          {/*        'px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg',*/}
+          {/*        'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100',*/}
+          {/*        'focus:ring-2 focus:ring-trackbee-500 focus:border-transparent'*/}
+          {/*      )}*/}
+          {/*    >*/}
+          {/*      <option value="all">Tous</option>*/}
+          {/*      <option value="connected">Connectés</option>*/}
+          {/*      <option value="disconnected">Déconnectés</option>*/}
+          {/*    </select>*/}
+          {/*  </div>*/}
+          {/*</div>*/}
+        {/*</div>*/}
 
         {/* Devices List */}
         {isLoading ? (
